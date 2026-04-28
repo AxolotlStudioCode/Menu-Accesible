@@ -8,12 +8,12 @@ let isHighContrast = false;
 let isBlindMode = false;
 let speechSynth = window.speechSynthesis;
 
-// Sistema de doble-tap para modo ciego
-let pendingAction = null;       // { fn, label } — acción pendiente de confirmar
-let pendingTimeout = null;      // timeout para limpiar la acción pendiente
+// Sistema de doble-tap para modo ciego (sin toast visual)
+let pendingAction = null;
+let pendingTimeout = null;
 
-// Historial del chat para la IA (multi-turn)
-let chatHistory = [];
+// Historial del chat (para el bot local, ya no se usa API externa)
+let chatHistory = [];  // Se conserva por si más adelante se reactiva la API
 
 // Datos de platillos
 const platillosData = {
@@ -74,8 +74,7 @@ function hablar(texto, onEnd) {
 
 // ==========================================
 // SISTEMA DE DOBLE-TAP PARA MODO CIEGO
-// (EL TOAST VISUAL HA SIDO ELIMINADO —
-//  solo queda la confirmación por voz)
+// (sin toast visual, solo confirmación por voz)
 // ==========================================
 function blindTap(label, fn, event) {
     if (!isBlindMode) {
@@ -87,17 +86,14 @@ function blindTap(label, fn, event) {
     event.stopPropagation();
 
     if (pendingAction && pendingAction.label === label) {
-        // Segundo toque: confirmar y ejecutar
         clearPendingAction();
         hablar('Confirmado. ' + label);
         fn();
     } else {
-        // Primer toque: describir por voz (sin toast visual)
         clearPendingAction();
         pendingAction = { fn, label };
         hablar(label + '. Toque de nuevo para confirmar.');
 
-        // Auto-cancelar tras 6 segundos sin segundo toque
         pendingTimeout = setTimeout(() => {
             clearPendingAction();
         }, 6000);
@@ -107,7 +103,7 @@ function blindTap(label, fn, event) {
 function clearPendingAction() {
     if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
     pendingAction = null;
-    // NOTA: Ya no se elimina ningún toast del DOM porque no se crea
+    // No se crean toasts visuales
 }
 
 // ==========================================
@@ -243,7 +239,7 @@ function leerElemento(e) {
 }
 
 // ==========================================
-// PANTALLA DE BIENVENIDA
+// PANTALLA DE BIENVENIDA Y SELECCIÓN DE MODO
 // ==========================================
 function speakWelcome() {
     const texto = "Bienvenido al menú digital accesible. " +
@@ -255,12 +251,38 @@ function speakWelcome() {
     hablar(texto);
 }
 
+// Función auxiliar para cerrar overlays
+function hideOverlay(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add('hidden');
+        setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
+    }
+}
+
 function selectMode(mode) {
-    if (mode !== 'blind') {
-        speechSynth.cancel();
+    speechSynth.cancel();
+
+    if (mode === 'blind') {
+        // En lugar de aplicar cambios automáticos, mostramos el diálogo de elección
+        closeWelcome(); // cierra la bienvenida
+        document.getElementById('blind-choice-overlay').style.display = 'flex';
+        return; // La configuración del modo ciego se hará en setBlindMode()
     }
 
-    localStorage.setItem('accessMode', mode);
+    // Otros modos se aplican directamente
+    aplicarModo(mode);
+    closeWelcome();
+}
+
+// Esta función aplica el modo según la elección en el diálogo de ciego
+function setBlindMode(choice) {
+    hideOverlay('blind-choice-overlay');
+    aplicarModo('blind', choice);
+}
+
+// Lógica central de aplicación de modos
+function aplicarModo(mode, blindChoice = null) {
     switch (mode) {
         case 'deaf':
             document.querySelectorAll('.btn-secondary').forEach(btn => {
@@ -270,27 +292,51 @@ function selectMode(mode) {
             break;
 
         case 'blind':
+            // Aplicar alto contraste y texto grande
             if (!isHighContrast) toggleHighContrast();
             document.documentElement.style.setProperty('--font-size-base', '20px');
-            isReadAloud = true;
-            document.getElementById('btn-read').classList.add('active');
-            document.addEventListener('click', leerElemento);
-            activarModoCiego();
-            hablar('Modo baja visión activado. Alto contraste y lector de voz habilitados. Toque cualquier platillo para escuchar su descripción. Toque dos veces los botones para confirmar su acción.');
+            
+            if (blindChoice === 'voice') {
+                // Asistente de voz activo
+                isReadAloud = true;
+                document.getElementById('btn-read').classList.add('active');
+                document.addEventListener('click', leerElemento);
+                activarModoCiego(); // modo doble-tap y foco
+                // Interfaz simplificada
+                document.body.classList.add('blind-voice-simplified');
+                // Abrir chatbot automáticamente y empezar a escuchar
+                const chatWindow = document.getElementById('chatbot-window');
+                if (!chatWindow.classList.contains('active')) toggleChatbot();
+                // Mensaje de bienvenida del asistente por voz
+                hablar('Modo asistente de voz activado. Puede hablarme para hacer su pedido.');
+                // Activar el micrófono automáticamente tras un breve retraso
+                setTimeout(() => {
+                    activarVoz(); // comienza la escucha
+                }, 800);
+            } else {
+                // Usar lector de pantalla: solo mejoras visuales, sin TTS forzado
+                isReadAloud = false;
+                document.getElementById('btn-read').classList.remove('active');
+                document.removeEventListener('click', leerElemento);
+                // No se activa el modo ciego de doble‑tap (puede navegar normalmente)
+                // Tampoco se simplifica la interfaz
+                hablar('Alto contraste y texto grande aplicados. Use su lector de pantalla habitual.');
+            }
             break;
 
         case 'quiet':
+            // Barrera para hablar: chatbot abierto, sin más
             closeWelcome();
             setTimeout(() => {
                 toggleChatbot();
                 setTimeout(() => { document.getElementById('chatbot-input').focus(); }, 150);
             }, 300);
-            return;
+            return; // closeWelcome ya se llamó dentro de selectMode para otros, pero aquí lo aseguramos
 
         default:
+            // default: sin cambios adicionales
             break;
     }
-    closeWelcome();
 }
 
 function activarModoCiego() {
@@ -310,16 +356,14 @@ function activarModoCiego() {
 }
 
 function closeWelcome() {
-    const overlay = document.getElementById('welcome-overlay');
-    overlay.classList.add('hidden');
-    setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 500);
+    hideOverlay('welcome-overlay');
 }
 
 // ==========================================
-// CHATBOT CON GEMINI API
+// CHATBOT (usando SOLO el bot local)
 // ==========================================
-const GEMINI_API_KEY = 'AIzaSyCu4ATmisfziZgVhWZP27zZAr5Ued3k3m4';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// La API de Gemini ha sido eliminada para evitar riesgos de seguridad.
+// El asistente funciona completamente sin conexión con processBotMessageLocal().
 
 function toggleChatbot() {
     const chatWindow = document.getElementById('chatbot-window');
@@ -337,115 +381,26 @@ function sendMessage() {
     if (message === '') return;
     addMessage(message, 'user');
     input.value = '';
-    chatHistory.push({ role: 'user', parts: [{ text: message }] });
-    callGeminiAPI(message);
+    // Llamada directa al bot local (sin API)
+    const respuesta = processBotMessageLocal(message);
+    // Simulamos un pequeño delay para que parezca que "piensa"
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
 }
 
-async function callGeminiAPI(userMessage) {
-    const typingDiv = document.createElement('div');
-    typingDiv.className = 'message bot-message typing-indicator';
-    typingDiv.innerHTML = '<div class="message-content"><span class="typing-dots"><span></span><span></span><span></span></span></div>';
-    document.getElementById('chatbot-messages').appendChild(typingDiv);
-    scrollChatToBottom();
-
-    const menuResumen = Object.entries(platillosData).map(([nombre, data]) =>
-        `- ${nombre}: $${data.price} | Ingredientes: ${data.ingredients.join(', ')}`
-    ).join('\n');
-
-    const ordenActual = orden.length > 0
-        ? orden.map(i => `${i.nombre} ($${i.precio.toFixed(2)})`).join(', ') + ` | Total: $${total.toFixed(2)}`
-        : 'vacía';
-
-    const systemInstruction = `Eres el asistente virtual de un menú digital inclusivo. Tu objetivo es facilitar la toma de pedidos a personas con barreras de comunicación.
-Responde en español, de forma muy cálida, concisa (máximo 2 oraciones) y con lenguaje sencillo.
-
-MENÚ ESTRICTO DISPONIBLE (No ofrezcas nada fuera de esta lista):
-${menuResumen}
-
-CARRITO ACTUAL DEL CLIENTE: ${ordenActual}
-
-REGLAS CRÍTICAS DE OPERACIÓN:
-1. Si el cliente pide información (alergenos, precios), responde amablemente basándote solo en el menú.
-2. Si el cliente PIDE o ORDENA un platillo, confirma verbalmente la orden y AÑADE OBLIGATORIAMENTE AL FINAL de tu respuesta la etiqueta exacta: [AGREGAR:Nombre Exacto].
-   Ejemplo de usuario: "Me das unos tacos"
-   Tu respuesta: "Claro que sí, enseguida preparamos tus Tacos al Pastor. [AGREGAR:Tacos al Pastor]"
-3. OJO: No uses la etiqueta [AGREGAR:...] si el usuario solo está preguntando por el platillo.
-4. Si el cliente pide la cuenta, finalizar o descargar, despídete amablemente y añade AL FINAL: [DESCARGAR_ORDEN].`;
-
-    try {
-        const response = await fetch(GEMINI_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemInstruction }] },
-                contents: chatHistory,
-                generationConfig: { 
-                    temperature: 0.2,
-                    maxOutputTokens: 150
-                },
-                safetySettings: [
-                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                ]
-            })
-        });
-
-        const data = await response.json();
-        typingDiv.remove();
-
-        if (!response.ok) {
-            console.error('Gemini API HTTP error:', response.status, data);
-            throw new Error(`HTTP ${response.status}: ${data?.error?.message || 'Sin detalle'}`);
-        }
-
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-            chatHistory.push({ role: 'model', parts: [{ text: rawText }] });
-            const botText = procesarComandosIA(rawText);
-            addMessage(botText, 'bot');
-            if (isReadAloud) hablar(botText);
-        } else {
-            throw new Error('Respuesta vacía de Gemini');
-        }
-    } catch (error) {
-        if (typingDiv.parentNode) typingDiv.remove();
-        console.error('Error Gemini API:', error);
-        const fallback = processBotMessageLocal(userMessage);
-        chatHistory.push({ role: 'model', parts: [{ text: fallback }] });
-        addMessage(fallback, 'bot');
-        if (isReadAloud) hablar(fallback);
-    }
-}
-
-function procesarComandosIA(texto) {
-    const agregarMatch = texto.match(/\[AGREGAR:([^\]]+)\]/);
-    if (agregarMatch) {
-        const nombre = agregarMatch[1].trim();
-        const platillo = platillosData[nombre];
-        if (platillo) {
-            agregarAlCarrito(nombre, platillo.price);
-        }
-        return texto.replace(/\[AGREGAR:[^\]]+\]/, '').trim();
-    }
-
-    if (texto.includes('[DESCARGAR_ORDEN]')) {
-        setTimeout(() => descargarOrden(), 500);
-        return texto.replace('[DESCARGAR_ORDEN]', '').trim();
-    }
-
-    return texto;
-}
-
+// ==========================================
+// BOT LOCAL DE RESPUESTA (mejorado)
+// ==========================================
 function processBotMessageLocal(message) {
     const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches/)) {
-        return "¡Hola! El asistente inteligente está en mantenimiento, pero te atiendo yo. Puedes pedirme el menú, ordenar algún platillo o consultar precios.";
+        return "¡Hola! Soy tu asistente virtual. Puedes pedirme el menú, consultar precios o hacer tu pedido directamente.";
     }
     if (msg.match(/recomienda|sugieres|mejor|rico/)) {
-        return "¡Te recomiendo mucho los Tacos al Pastor o la Hamburguesa Clásica! Son los favoritos de la casa. ¿Te gustaría ordenar alguno?";
+        return "Te recomiendo los Tacos al Pastor o la Hamburguesa Clásica. ¿Cuál te gustaría ordenar?";
     }
 
     if (msg.match(/menu|carta|opciones|comida|que hay|tienen/)) {
@@ -464,7 +419,7 @@ function processBotMessageLocal(message) {
         if (msg.match(/pollo|teriyaki/)) return "El Pollo Teriyaki tiene un precio de $17.99. Incluye pechuga glaseada, arroz al vapor y vegetales.";
         if (msg.match(/salmon|filete/)) return "El Filete de Salmón vale $24.99 y viene acompañado de puré de papa y espárragos al vapor.";
 
-        return "Si deseas saber el precio o ingredientes de un platillo, por favor menciona su nombre (ej. 'precio de los tacos' o 'qué lleva la pizza').";
+        return "Si deseas saber el precio o ingredientes de un platillo, menciona su nombre (ej. 'precio de los tacos').";
     }
 
     let platilloAgregado = false;
@@ -472,7 +427,7 @@ function processBotMessageLocal(message) {
 
     if (msg.match(/taco|pastor|tacos/)) {
         agregarAlCarrito('Tacos al Pastor', 12.99);
-        respuesta = "¡Excelente elección! He agregado unos Tacos al Pastor a tu orden. ";
+        respuesta = "¡Excelente! He agregado unos Tacos al Pastor a tu orden. ";
         platilloAgregado = true;
     }
     else if (msg.match(/hamburguesa|burger/)) {
@@ -487,41 +442,41 @@ function processBotMessageLocal(message) {
     }
     else if (msg.match(/sushi|california|rollo/)) {
         agregarAlCarrito('Sushi Roll California', 18.99);
-        respuesta = "Sushi Roll California agregado a tu cuenta. ¡Delicioso! ";
+        respuesta = "Sushi Roll California agregado a tu cuenta. ";
         platilloAgregado = true;
     }
     else if (msg.match(/ensalada|cesar/)) {
         agregarAlCarrito('Ensalada César', 11.99);
-        respuesta = "Una opción fresca. Ensalada César agregada a tu orden. ";
+        respuesta = "Ensalada César agregada. ";
         platilloAgregado = true;
     }
     else if (msg.match(/pasta|carbonara|espagueti|spaghetti/)) {
         agregarAlCarrito('Pasta Carbonara', 15.99);
-        respuesta = "¡Mamma mia! Pasta Carbonara en tu carrito. ";
+        respuesta = "Pasta Carbonara en tu carrito. ";
         platilloAgregado = true;
     }
     else if (msg.match(/pollo|teriyaki/)) {
         agregarAlCarrito('Pollo Teriyaki', 17.99);
-        respuesta = "Pollo Teriyaki añadido a tu orden. ¡Buena elección! ";
+        respuesta = "Pollo Teriyaki añadido. ";
         platilloAgregado = true;
     }
     else if (msg.match(/salmon|filete/)) {
         agregarAlCarrito('Filete de Salmón', 24.99);
-        respuesta = "Un Filete de Salmón agregado a tu cuenta. ";
+        respuesta = "Filete de Salmón agregado. ";
         platilloAgregado = true;
     }
 
     if (platilloAgregado) {
-        return respuesta + "¿Deseas algo más o te preparo la cuenta?";
+        return respuesta + "¿Deseas algo más o preparo la cuenta?";
     }
 
     if (msg.match(/total|cuenta|llevo|pedido|orden|cuanto es/)) {
         if (orden.length === 0) return "Tu orden está vacía en este momento. ¿Te sirvo algo?";
-        return `Llevas ${orden.length} platillos. El total es de $${total.toFixed(2)}. Si ya terminaste, dime "descargar orden" o "pagar".`;
+        return `Llevas ${orden.length} platillos. El total es de $${total.toFixed(2)}. Si ya terminaste, di "descargar orden" o "pagar".`;
     }
 
     if (msg.match(/quitar|eliminar|borrar|cancelar/)) {
-        return "Para quitar un platillo de tu orden, por favor usa el botón con la 'X' roja que está junto al precio en tu carrito visual.";
+        return "Para quitar un platillo de tu orden, usa el botón con la 'X' roja que está junto al precio en tu carrito visual.";
     }
 
     if (msg.match(/descargar|pagar|terminar|finalizar|listo|ya/)) {
@@ -534,7 +489,7 @@ function processBotMessageLocal(message) {
         return "¡Con gusto! Aquí sigo si necesitas agregar algo más.";
     }
 
-    return "No te entendí muy bien. Recuerda que puedes preguntarme cosas como '¿qué lleva el sushi?', o pedir directamente 'quiero unos tacos'.";
+    return "No te entendí muy bien. Puedes preguntarme '¿qué lleva el sushi?' o pedir directamente 'quiero unos tacos'.";
 }
 
 function addMessage(text, sender) {
@@ -562,7 +517,7 @@ function handleChatKeypress(event) {
 }
 
 // ==========================================
-// RECONOCIMIENTO DE VOZ — CORREGIDO Y ROBUSTO
+// RECONOCIMIENTO DE VOZ
 // ==========================================
 let recognitionInstance = null;
 
@@ -575,24 +530,17 @@ function activarVoz() {
         return;
     }
 
-    // Si ya está escuchando, detener la instancia actual
     if (recognitionInstance) {
-        try {
-            recognitionInstance.stop();
-        } catch (e) {
-            // Ignorar errores al detener
-        }
+        try { recognitionInstance.stop(); } catch(e) {}
         recognitionInstance = null;
         micBtn.classList.remove('listening');
         micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
         return;
     }
 
-    // Asegurar que el chat esté abierto
     const chatWindow = document.getElementById('chatbot-window');
     if (!chatWindow.classList.contains('active')) toggleChatbot();
 
-    // Cancelar TTS antes de activar el micrófono
     speechSynth.cancel();
 
     const recognition = new SpeechRecognition();
@@ -607,7 +555,6 @@ function activarVoz() {
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        // Limpiar estado ANTES de enviar el mensaje
         recognitionInstance = null;
         micBtn.classList.remove('listening');
         micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
@@ -621,19 +568,18 @@ function activarVoz() {
         micBtn.classList.remove('listening');
         micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
         const msgs = {
-            'not-allowed':        'Permiso de micrófono denegado. Habilítelo en los ajustes del navegador e intente de nuevo.',
-            'permission-denied':  'Permiso de micrófono denegado. Habilítelo en los ajustes del navegador e intente de nuevo.',
-            'no-speech':          'No escuché nada. Intente de nuevo hablando cerca del micrófono.',
-            'audio-capture':      'No se encontró micrófono. Verifique que su dispositivo tenga uno conectado.',
-            'network':            'Error de red al procesar la voz. Verifique su conexión.',
-            'aborted':            'Micrófono cancelado.',
+            'not-allowed': 'Permiso de micrófono denegado. Habilítelo en los ajustes del navegador e intente de nuevo.',
+            'permission-denied': 'Permiso de micrófono denegado.',
+            'no-speech': 'No escuché nada. Intente de nuevo.',
+            'audio-capture': 'No se encontró micrófono.',
+            'network': 'Error de red. Verifique su conexión.',
+            'aborted': 'Micrófono cancelado.',
         };
         const msg = msgs[event.error] || `Error de micrófono (${event.error}). Intente escribir su mensaje.`;
         addMessage(msg, 'bot');
     };
 
     recognition.onend = () => {
-        // Solo limpiar si este recognition sigue siendo la instancia activa
         if (recognitionInstance === recognition) {
             recognitionInstance = null;
             micBtn.classList.remove('listening');
@@ -641,7 +587,6 @@ function activarVoz() {
         }
     };
 
-    // Pequeño retraso para asegurar que TTS se haya cancelado completamente
     setTimeout(() => {
         try {
             recognition.start();
@@ -659,8 +604,12 @@ function enviarMensajeDirecto(texto) {
     if (!texto || texto.trim() === '') return;
     document.getElementById('chatbot-input').value = '';
     addMessage(texto, 'user');
-    chatHistory.push({ role: 'user', parts: [{ text: texto }] });
-    callGeminiAPI(texto);
+    // Usar solo el bot local
+    const respuesta = processBotMessageLocal(texto);
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
 }
 
 // ==========================================
@@ -693,7 +642,6 @@ function toggleHighContrast() {
 // INICIALIZACIÓN
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Animación de entrada para las tarjetas
     document.querySelectorAll('.card').forEach((card, index) => {
         card.style.opacity = '0';
         card.style.transform = 'translateY(20px)';
@@ -704,7 +652,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, index * 80);
     });
 
-    // Voz de bienvenida automática
     let voiceStarted = false;
     function iniciarVozBienvenida() {
         if (voiceStarted) return;
@@ -713,10 +660,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setTimeout(iniciarVozBienvenida, 800);
-
-    // Respaldo para iOS/Android: arrancar en el primer toque
     document.addEventListener('pointerdown', iniciarVozBienvenida, { once: true });
 
-    // Limpiar modo guardado para elegir cada vez
+    // Limpiar modo guardado
     localStorage.removeItem('accessMode');
 });
