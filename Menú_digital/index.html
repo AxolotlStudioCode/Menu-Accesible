@@ -46,6 +46,12 @@
                 </button>
             </div>
             
+            <!-- Botón para desactivar TTS (modo no ciego) -->
+            <button class="welcome-skip" id="btn-disable-tts" onclick="desactivarTTS()" 
+                    aria-label="Si no tienes ceguera presiona este botón para silenciar la voz">
+                <i class="fas fa-volume-mute"></i> Si no tienes ceguera presiona este botón
+            </button>
+            
             <button class="welcome-skip" onclick="closeWelcome()">Decidir después</button>
         </div>
     </div>
@@ -70,7 +76,7 @@
         </div>
     </div>
 
-    <!-- PANEL DE ACCESIBILIDAD -->
+    <!-- PANEL DE ACCESIBILIDAD (se oculta en modo ciego voz) -->
     <aside class="accessibility-panel" aria-label="Opciones de accesibilidad">
         <button class="toggle-panel" onclick="toggleAccessPanel()" aria-expanded="false">
             <i class="fas fa-sliders"></i>
@@ -98,7 +104,7 @@
         </div>
     </aside>
 
-    <!-- HEADER -->
+    <!-- HEADER (se oculta en modo ciego voz) -->
     <header role="banner">
         <div class="logo">
             <div class="logo-icon"><i class="fas fa-utensils"></i></div>
@@ -109,6 +115,7 @@
         </div>
     </header>
 
+    <!-- CONTENEDOR PRINCIPAL (se oculta en modo ciego voz) -->
     <main class="main-container">
         
         <!-- GRID DE PLATILLOS -->
@@ -118,7 +125,7 @@
                 <p class="section-subtitle">Cada platillo incluye video informativo con lenguaje de señas, descripción detallada e ingredientes</p>
             </div>
 
-            <!-- Platillo 1 -->
+            <!-- Platillos (8 artículos) -->
             <article class="card" data-name="Tacos al Pastor" data-price="12.99">
                 <div class="card-image">
                     <img src="assets/images/Taco.png" alt="Tacos al Pastor con carne de cerdo marinada, piña, cilantro y cebolla">
@@ -150,7 +157,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 2 -->
             <article class="card" data-name="Hamburguesa Clásica" data-price="14.99">
                 <div class="card-image">
                     <img src="assets/images/Hamburguesa.png" alt="Hamburguesa clásica con carne de res, queso, lechuga y tomate">
@@ -183,7 +189,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 3 -->
             <article class="card" data-name="Pizza Margarita" data-price="16.99">
                 <div class="card-image">
                     <img src="assets/images/Pizza.png" alt="Pizza margarita con tomate, mozzarella y albahaca">
@@ -215,7 +220,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 4 -->
             <article class="card" data-name="Sushi Roll California" data-price="18.99">
                 <div class="card-image">
                     <img src="assets/images/Sushi.png" alt="Sushi roll california con cangrejo, aguacate y pepino">
@@ -248,7 +252,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 5 -->
             <article class="card" data-name="Ensalada César" data-price="11.99">
                 <div class="card-image">
                     <img src="assets/images/Ensalada.png" alt="Ensalada césar con lechuga, crutones y parmesano">
@@ -281,7 +284,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 6 -->
             <article class="card" data-name="Pasta Carbonara" data-price="15.99">
                 <div class="card-image">
                     <img src="assets/images/Salsa Carbonara.png" alt="Pasta carbonara con panceta, huevo y queso">
@@ -315,7 +317,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 7 -->
             <article class="card" data-name="Pollo Teriyaki" data-price="17.99">
                 <div class="card-image">
                     <img src="assets/images/Pollo Teriyaki.png" alt="Pollo teriyaki glaseado con salsa teriyaki">
@@ -347,7 +348,6 @@
                 </div>
             </article>
 
-            <!-- Platillo 8 -->
             <article class="card" data-name="Filete de Salmón" data-price="24.99">
                 <div class="card-image">
                     <img src="assets/images/Filete de salmón.png" alt="Filete de salmón a la parrilla con limón">
@@ -378,10 +378,9 @@
                     </div>
                 </div>
             </article>
-
         </section>
 
-        <!-- SIDEBAR DE ORDEN -->
+        <!-- SIDEBAR DE ORDEN (se oculta en modo ciego voz) -->
         <aside class="sidebar" aria-label="Resumen de su orden">
             <div class="order-box">
                 <h3><i class="fas fa-shopping-cart"></i> Su Orden</h3>
@@ -401,7 +400,6 @@
                 </div>
             </div>
         </aside>
-
     </main>
 
     <!-- MODAL DE VIDEO -->
@@ -424,7 +422,13 @@
         </div>
     </div>
 
-    <!-- CHATBOT (se convierte en la interfaz principal en modo ciego con voz) -->
+    <!-- BURBUJA PARA MODO CIEGO (solo visible en blind-voice-simplified) -->
+    <div id="blind-bubble" class="blind-bubble hidden">
+        <div class="bubble-circle" id="bubble-circle"></div>
+        <div class="bubble-text" id="bubble-text"></div>
+    </div>
+
+    <!-- CHATBOT (se usa como entrada/salida en modo ciego voz) -->
     <div class="chatbot-container">
         <button class="chatbot-toggle" onclick="toggleChatbot()" aria-expanded="false" aria-label="Abrir asistente virtual">
             <i class="fas fa-headset"></i>
@@ -485,13 +489,11 @@
                 const precio = parseFloat(btn.dataset.precio);
                 const fn = () => agregarAlCarrito(nombre, precio, 1);
                 blindTap(label, fn, e);
-
             } else if (action === 'video') {
                 const nombre = btn.dataset.nombre;
                 const url    = btn.dataset.url;
                 const fn = () => abrirVideo(nombre, url);
                 blindTap(label, fn, e);
-
             } else if (action === 'descargar') {
                 const fn = () => descargarOrden();
                 blindTap(label, fn, e);
