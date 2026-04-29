@@ -10,9 +10,42 @@
 </head>
 <body>
 
-    <!-- PANTALLA DE BIENVENIDA -->
-    <div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+    <!-- PANTALLA 1: PREGUNTAR SI QUIERE TTS -->
+    <div class="welcome-overlay" id="tts-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="tts-prompt-title">
+        <div class="welcome-modal tts-prompt-modal">
+            <div class="tts-prompt-icon">
+                <i class="fas fa-volume-high"></i>
+            </div>
+            <h2 id="tts-prompt-title">¿Desea activar el audio?</h2>
+            <p class="welcome-sub">El menú puede leer en voz alta los textos y opciones para facilitar la navegación a personas con baja visión o ceguera.</p>
+            
+            <div class="tts-prompt-buttons">
+                <button class="tts-btn tts-btn-yes" onclick="responderTTS(true)" aria-label="Sí, activar audio y lector de voz">
+                    <i class="fas fa-volume-high"></i>
+                    <span>Sí, activar audio</span>
+                    <small>Recomendado si tiene baja visión</small>
+                </button>
+                <button class="tts-btn tts-btn-no" onclick="responderTTS(false)" aria-label="No, continuar sin audio">
+                    <i class="fas fa-volume-xmark"></i>
+                    <span>No, sin audio</span>
+                    <small>Navegación visual normal</small>
+                </button>
+            </div>
+            <p class="tts-prompt-hint">
+                <i class="fas fa-microphone"></i> El micrófono está disponible — si necesita ayuda diga <strong>"activar audio"</strong>
+            </p>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE BIENVENIDA (selección de modo) -->
+    <div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title" style="display:none;">
         <div class="welcome-modal">
+            <!-- Botón silenciar: fijo arriba a la derecha del modal -->
+            <button class="btn-mute-tts" id="btn-disable-tts" onclick="desactivarTTS()" 
+                    aria-label="Silenciar audio">
+                <i class="fas fa-volume-xmark"></i> Silenciar
+            </button>
+
             <button class="welcome-speak" onclick="speakWelcome()" aria-label="Escuchar instrucciones">
                 <i class="fas fa-volume-high"></i> Escuchar instrucciones
             </button>
@@ -45,12 +78,6 @@
                     <span class="option-desc">Chatbot y orden sin interacción verbal</span>
                 </button>
             </div>
-            
-            <!-- Botón para desactivar TTS (modo no ciego) -->
-            <button class="welcome-skip" id="btn-disable-tts" onclick="desactivarTTS()" 
-                    aria-label="Si no tienes ceguera presiona este botón para silenciar la voz">
-                <i class="fas fa-volume-mute"></i> Si no tienes ceguera presiona este botón
-            </button>
             
             <button class="welcome-skip" onclick="closeWelcome()">Decidir después</button>
         </div>
@@ -424,8 +451,20 @@
 
     <!-- BURBUJA PARA MODO CIEGO (solo visible en blind-voice-simplified) -->
     <div id="blind-bubble" class="blind-bubble hidden">
-        <div class="bubble-circle" id="bubble-circle"></div>
+        <div class="bubble-outer-ring" id="bubble-outer-ring"></div>
+        <div class="bubble-circle" id="bubble-circle">
+            <div class="bubble-icon" id="bubble-icon">
+                <i class="fas fa-microphone" id="bubble-icon-glyph"></i>
+            </div>
+            <div class="bubble-waves" id="bubble-waves">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="bubble-status" id="bubble-status">Toca para hablar</div>
         <div class="bubble-text" id="bubble-text"></div>
+        <button class="bubble-tap-btn" id="bubble-tap-btn" onclick="activarVozCiego()" 
+                aria-label="Toca para hablar con el asistente">
+        </button>
     </div>
 
     <!-- CHATBOT (se usa como entrada/salida en modo ciego voz) -->
