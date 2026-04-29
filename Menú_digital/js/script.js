@@ -227,63 +227,51 @@ function leerElemento(e) {
 // ==========================================
 // PANTALLA DE BIENVENIDA Y SELECCIÓN DE MODO
 // ==========================================
-// ==========================================
-// PANTALLA TTS PROMPT (primera pantalla al cargar)
-// ==========================================
-let ttsPromptListening = false; // micrófono de bienvenida
+// Escucha de voz en la pantalla de selección (para modo ciego-reader sin TTS)
+let modoSeleccionRecognition = null;
 
-function mostrarTTSPrompt() {
-    // Hablar el prompt para que ciegos puedan escuchar sin haberlo activado aún
-    const utterance = new SpeechSynthesisUtterance(
-        "Bienvenido al menú digital accesible. ¿Desea activar el audio para facilitar la navegación? " +
-        "Diga Sí para activarlo o No para continuar sin audio. También puede tocar los botones en pantalla."
-    );
-    utterance.lang = 'es-MX';
-    utterance.rate = 0.9;
-    speechSynth.speak(utterance);
-
-    // Iniciar micrófono de bienvenida para que ciegos puedan responder
+function iniciarMicSeleccion() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
-    setTimeout(() => {
-        const rec = new SpeechRecognition();
-        rec.lang = 'es-MX';
-        rec.continuous = false;
-        rec.interimResults = false;
-        ttsPromptListening = true;
-        rec.onresult = (e) => {
-            ttsPromptListening = false;
-            const texto = e.results[0][0].transcript.toLowerCase();
-            if (texto.includes('sí') || texto.includes('si') || texto.includes('yes') || texto.includes('activar')) {
-                responderTTS(true);
-            } else if (texto.includes('no') || texto.includes('sin audio') || texto.includes('silencio')) {
-                responderTTS(false);
-            }
-        };
-        rec.onerror = () => { ttsPromptListening = false; };
-        try { rec.start(); } catch(e) {}
-    }, 3500); // esperar a que termine de hablar
+    if (modoSeleccionRecognition) return; // ya activo
+    const rec = new SpeechRecognition();
+    modoSeleccionRecognition = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+        const texto = e.results[e.results.length - 1][0].transcript.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (texto.includes('sin barrera') || texto.includes('uno') || texto.includes('1')) {
+            detenerMicSeleccion(); selectMode('default');
+        } else if (texto.includes('sordera') || texto.includes('hipoacusia') || texto.includes('dos') || texto.includes('2')) {
+            detenerMicSeleccion(); selectMode('deaf');
+        } else if (texto.includes('ceguera') || texto.includes('baja vision') || texto.includes('tres') || texto.includes('3')) {
+            detenerMicSeleccion(); selectMode('blind');
+        } else if (texto.includes('hablar') || texto.includes('barrera') || texto.includes('cuatro') || texto.includes('4')) {
+            detenerMicSeleccion(); selectMode('quiet');
+        }
+    };
+    rec.onerror = () => { modoSeleccionRecognition = null; };
+    rec.onend = () => { modoSeleccionRecognition = null; };
+    try { rec.start(); } catch(e) { modoSeleccionRecognition = null; }
 }
 
-function responderTTS(activar) {
-    speechSynth.cancel();
-    ttsPromptListening = false;
-    // Ocultar pantalla TTS
-    const ttsOverlay = document.getElementById('tts-prompt-overlay');
-    if (ttsOverlay) { ttsOverlay.classList.add('hidden'); setTimeout(() => ttsOverlay.remove(), 500); }
-    // Configurar TTS según respuesta
-    if (activar) {
-        isReadAloud = true;
-        document.getElementById('btn-read').classList.add('active');
-    } else {
-        isReadAloud = false;
+function detenerMicSeleccion() {
+    if (modoSeleccionRecognition) {
+        try { modoSeleccionRecognition.stop(); } catch(e) {}
+        modoSeleccionRecognition = null;
     }
-    // Mostrar pantalla de selección de modo
+}
+
+function mostrarPantallaSeleccion() {
     const welcomeEl = document.getElementById('welcome-overlay');
     if (welcomeEl) {
         welcomeEl.style.display = 'flex';
         setTimeout(() => {
             if (isReadAloud) speakWelcome();
+            // Cambio 5: Micrófono siempre activo en la pantalla de selección
+            iniciarMicSeleccion();
         }, 300);
     }
 }
@@ -297,6 +285,7 @@ function hideOverlay(id) {
 }
 function selectMode(mode) {
     speechSynth.cancel();
+    detenerMicSeleccion();
     if (mode === 'blind') {
         closeWelcome();
         document.getElementById('blind-choice-overlay').style.display = 'flex';
@@ -308,8 +297,12 @@ function selectMode(mode) {
 function setBlindMode(choice) {
     hideOverlay('blind-choice-overlay');
     aplicarModo('blind', choice);
+    // Guardar elección en sessionStorage (persiste en recarga, no en cierre de pestaña)
+    sessionStorage.setItem('blindChoice', choice);
 }
 function aplicarModo(mode, blindChoice = null) {
+    // Guardar el modo en sessionStorage (persiste en recarga, no en cierre de pestaña)
+    sessionStorage.setItem('accessMode', mode);
     switch (mode) {
         case 'deaf':
             document.querySelectorAll('.btn-secondary').forEach(b => { b.style.borderColor = '#2563EB'; b.style.background = '#DBEAFE'; });
@@ -318,6 +311,7 @@ function aplicarModo(mode, blindChoice = null) {
             if (!isHighContrast) toggleHighContrast();
             document.documentElement.style.setProperty('--font-size-base', '20px');
             if (blindChoice === 'voice') {
+                // TTS solo activo para modo voz
                 isReadAloud = true;
                 document.getElementById('btn-read').classList.add('active');
                 document.addEventListener('click', leerElemento);
@@ -338,10 +332,11 @@ function aplicarModo(mode, blindChoice = null) {
                     });
                 }, 500);
             } else {
+                // Modo reader: TTS desactivado, solo alto contraste y texto grande
                 isReadAloud = false;
                 document.getElementById('btn-read').classList.remove('active');
                 document.removeEventListener('click', leerElemento);
-                hablar('Alto contraste y texto grande aplicados.');
+                // NO hablar aquí — el usuario usa su propio lector de pantalla
             }
             break;
         case 'quiet':
@@ -676,7 +671,7 @@ function toggleHighContrast() {
 }
 
 // ==========================================
-// INICIALIZACIÓN (voz y micrófono desde el inicio)
+// INICIALIZACIÓN
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.card').forEach((card, i) => {
@@ -686,15 +681,22 @@ document.addEventListener('DOMContentLoaded', () => {
             card.style.opacity = '1'; card.style.transform = 'translateY(0)';
         }, i * 80);
     });
-    // Mostrar pantalla TTS prompt al abrir la página
-    // (se inicia con un pequeño retardo para que el navegador esté listo)
-    let ttsPromptStarted = false;
-    function iniciarTTSPrompt() {
-        if (ttsPromptStarted) return;
-        ttsPromptStarted = true;
-        mostrarTTSPrompt();
+
+    // Cambio 3: Restaurar sesión si la página se recargó (sessionStorage persiste en recarga,
+    // pero se borra al cerrar la pestaña — exactamente el comportamiento pedido)
+    const savedMode = sessionStorage.getItem('accessMode');
+    const savedBlindChoice = sessionStorage.getItem('blindChoice');
+
+    if (savedMode) {
+        // La persona ya eligió antes en esta sesión (recarga) — restaurar directamente
+        if (savedMode === 'blind' && savedBlindChoice) {
+            aplicarModo('blind', savedBlindChoice);
+        } else {
+            aplicarModo(savedMode);
+        }
+        // No mostrar pantalla de selección
+    } else {
+        // Primera visita o pestaña nueva — mostrar pantalla de selección
+        setTimeout(() => mostrarPantallaSeleccion(), 400);
     }
-    setTimeout(iniciarTTSPrompt, 800);
-    document.addEventListener('pointerdown', iniciarTTSPrompt, { once: true });
-    localStorage.removeItem('accessMode');
 });
