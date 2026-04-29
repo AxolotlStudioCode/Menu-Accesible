@@ -1,544 +1,702 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>Menú Digital Accesible - Experiencia Inclusiva</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body>
+// ==========================================
+// VARIABLES GLOBALES
+// ==========================================
+let total = 0;
+let orden = [];
+let isReadAloud = false;
+let isHighContrast = false;
+let isBlindMode = false;
+let speechSynth = window.speechSynthesis;
 
-    <!-- PANTALLA 1: PREGUNTAR SI QUIERE TTS -->
-    <div class="welcome-overlay" id="tts-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="tts-prompt-title">
-        <div class="welcome-modal tts-prompt-modal">
-            <div class="tts-prompt-icon">
-                <i class="fas fa-volume-high"></i>
-            </div>
-            <h2 id="tts-prompt-title">¿Desea activar el audio?</h2>
-            <p class="welcome-sub">El menú puede leer en voz alta los textos y opciones para facilitar la navegación a personas con baja visión o ceguera.</p>
-            
-            <div class="tts-prompt-buttons">
-                <button class="tts-btn tts-btn-yes" onclick="responderTTS(true)" aria-label="Sí, activar audio y lector de voz">
-                    <i class="fas fa-volume-high"></i>
-                    <span>Sí, activar audio</span>
-                    <small>Recomendado si tiene baja visión</small>
-                </button>
-                <button class="tts-btn tts-btn-no" onclick="responderTTS(false)" aria-label="No, continuar sin audio">
-                    <i class="fas fa-volume-xmark"></i>
-                    <span>No, sin audio</span>
-                    <small>Navegación visual normal</small>
-                </button>
-            </div>
-            <p class="tts-prompt-hint">
-                <i class="fas fa-microphone"></i> El micrófono está disponible — si necesita ayuda diga <strong>"activar audio"</strong>
-            </p>
-        </div>
-    </div>
+// Sistema de doble-tap para modo ciego
+let pendingAction = null;
+let pendingTimeout = null;
 
-    <!-- PANTALLA DE BIENVENIDA (selección de modo) -->
-    <div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title" style="display:none;">
-        <div class="welcome-modal">
-            <!-- Botón silenciar: fijo arriba a la derecha del modal -->
-            <button class="btn-mute-tts" id="btn-disable-tts" onclick="desactivarTTS()" 
-                    aria-label="Silenciar audio">
-                <i class="fas fa-volume-xmark"></i> Silenciar
-            </button>
+// Datos de platillos (sin cambios)
+const platillosData = {
+    'Tacos al Pastor': { 
+        desc: 'Nuestros tacos al pastor...',
+        ingredients: ['Carne de cerdo', 'Chile guajillo', 'Chile ancho', 'Piña natural', 'Achiote', 'Cilantro', 'Cebolla', 'Tortillas de maíz'],
+        price: 12.99
+    },
+    'Hamburguesa Clásica': {
+        desc: 'Hamburguesa artesanal de 200g...',
+        ingredients: ['Carne de res molida premium', 'Queso cheddar', 'Lechuga romana', 'Tomate', 'Cebolla', 'Pepinillos', 'Pan brioche', 'Salsas especiales'],
+        price: 14.99
+    },
+    'Pizza Margarita': {
+        desc: 'Pizza tradicional italiana...',
+        ingredients: ['Masa de pizza artesanal', 'Tomates San Marzano', 'Mozzarella di bufala', 'Albahaca fresca', 'Aceite de oliva extra virgen', 'Sal marina', 'Orégano'],
+        price: 16.99
+    },
+    'Sushi Roll California': {
+        desc: 'Rollo de sushi estilo California...',
+        ingredients: ['Arroz para sushi', 'Nori (alga marina)', 'Imitación de cangrejo', 'Aguacate', 'Pepino', 'Mayonesa japonesa', 'Semillas de ajonjolí', 'Salsa de soya'],
+        price: 18.99
+    },
+    'Ensalada César': {
+        desc: 'Ensalada clásica César...',
+        ingredients: ['Lechuga romana', 'Queso parmesano', 'Huevo', 'Pan para crutones', 'Aceite de oliva', 'Mostaza Dijon', 'Limón', 'Ajo'],
+        price: 11.99
+    },
+    'Pasta Carbonara': {
+        desc: 'Auténtica pasta carbonara romana...',
+        ingredients: ['Espagueti', 'Panceta', 'Queso pecorino romano', 'Huevo', 'Pimienta negra', 'Sal'],
+        price: 15.99
+    },
+    'Pollo Teriyaki': {
+        desc: 'Pechuga de pollo jugosa...',
+        ingredients: ['Pechuga de pollo', 'Salsa de soya', 'Sake', 'Azúcar', 'Jengibre', 'Ajo', 'Vegetales variados'],
+        price: 17.99
+    },
+    'Filete de Salmón': {
+        desc: 'Filete de salmón noruego fresco...',
+        ingredients: ['Filete de salmón noruego', 'Limón', 'Mantequilla', 'Perejil', 'Eneldo', 'Papas', 'Espárragos', 'Sal y pimienta'],
+        price: 24.99
+    }
+};
 
-            <button class="welcome-speak" onclick="speakWelcome()" aria-label="Escuchar instrucciones">
-                <i class="fas fa-volume-high"></i> Escuchar instrucciones
-            </button>
-            
-            <h2 id="welcome-title">Bienvenido al Menú Digital Accesible</h2>
-            <p class="welcome-sub">Para brindarle la mejor experiencia, seleccione su barrera de comunicación o necesidad de accesibilidad:</p>
-            
-            <div class="welcome-options">
-                <button class="welcome-option" onclick="selectMode('default')">
-                    <div class="option-icon-wrapper"><i class="fas fa-user"></i></div>
-                    <span class="option-title">Sin barrera de comunicación</span>
-                    <span class="option-desc">Navegación visual completa con todos los elementos</span>
-                </button>
-                
-                <button class="welcome-option" onclick="selectMode('deaf')">
-                    <div class="option-icon-wrapper"><i class="fas fa-hands-asl-interpreting"></i></div>
-                    <span class="option-title">Sordera o hipoacusia</span>
-                    <span class="option-desc">Videos con lenguaje de señas y subtítulos</span>
-                </button>
-                
-                <button class="welcome-option" onclick="selectMode('blind')">
-                    <div class="option-icon-wrapper"><i class="fas fa-universal-access"></i></div>
-                    <span class="option-title">Baja visión o ceguera</span>
-                    <span class="option-desc">Alto contraste, texto grande y lector de voz</span>
-                </button>
-                
-                <button class="welcome-option" onclick="selectMode('quiet')">
-                    <div class="option-icon-wrapper"><i class="fas fa-comment-slash"></i></div>
-                    <span class="option-title">Barrera para hablar</span>
-                    <span class="option-desc">Chatbot y orden sin interacción verbal</span>
-                </button>
-            </div>
-            
-            <button class="welcome-skip" onclick="closeWelcome()">Decidir después</button>
-        </div>
-    </div>
+// ==========================================
+// SISTEMA DE VOZ
+// ==========================================
+function hablar(texto, onEnd) {
+    if (speechSynth.speaking) speechSynth.cancel();
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-MX';
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    // Sincronizar con burbuja modo ciego
+    const circle = document.getElementById('bubble-circle');
+    if (circle && isBlindMode) {
+        circle.classList.remove('listening', 'idle');
+        circle.classList.add('speaking');
+    }
+    utterance.onend = () => {
+        if (circle && isBlindMode) {
+            circle.classList.remove('speaking');
+            circle.classList.add('idle');
+        }
+        if (onEnd) onEnd();
+    };
+    speechSynth.speak(utterance);
+}
 
-    <!-- DIÁLOGO PARA MODO CIEGO (elección de asistente) -->
-    <div class="welcome-overlay blind-choice-overlay" id="blind-choice-overlay" role="dialog" aria-modal="true" aria-labelledby="blind-choice-title" style="display:none;">
-        <div class="welcome-modal blind-choice-modal">
-            <h2 id="blind-choice-title">¿Cómo prefiere interactuar?</h2>
-            <p class="welcome-sub">Elija su método de asistencia para navegar el menú.</p>
-            <div class="welcome-options">
-                <button class="welcome-option" onclick="setBlindMode('voice')">
-                    <div class="option-icon-wrapper"><i class="fas fa-microphone"></i></div>
-                    <span class="option-title">Asistente de voz activo</span>
-                    <span class="option-desc">El chatbot se activará para atender su pedido por voz</span>
-                </button>
-                <button class="welcome-option" onclick="setBlindMode('reader')">
-                    <div class="option-icon-wrapper"><i class="fas fa-volume-up"></i></div>
-                    <span class="option-title">Usar mi lector de pantalla</span>
-                    <span class="option-desc">Solo se aplicará alto contraste y texto grande</span>
-                </button>
-            </div>
-        </div>
-    </div>
+// ==========================================
+// SISTEMA DE DOBLE-TAP PARA MODO CIEGO
+// ==========================================
+function blindTap(label, fn, event) {
+    if (!isBlindMode) {
+        fn();
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (pendingAction && pendingAction.label === label) {
+        clearPendingAction();
+        hablar('Confirmado. ' + label);
+        fn();
+    } else {
+        clearPendingAction();
+        pendingAction = { fn, label };
+        hablar(label + '. Toque de nuevo para confirmar.');
+        pendingTimeout = setTimeout(() => clearPendingAction(), 6000);
+    }
+}
+function clearPendingAction() {
+    if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+    pendingAction = null;
+}
 
-    <!-- PANEL DE ACCESIBILIDAD (se oculta en modo ciego voz) -->
-    <aside class="accessibility-panel" aria-label="Opciones de accesibilidad">
-        <button class="toggle-panel" onclick="toggleAccessPanel()" aria-expanded="false">
-            <i class="fas fa-sliders"></i>
-        </button>
-        <div class="panel-content" id="panel-content">
-            <h3><i class="fas fa-sliders"></i> Configuración</h3>
-            <div class="access-option">
-                <label>Tamaño de texto</label>
-                <div class="btn-group">
-                    <button onclick="changeFontSize(-2)">A-</button>
-                    <button onclick="changeFontSize(0)">A</button>
-                    <button onclick="changeFontSize(2)">A+</button>
-                </div>
-            </div>
-            <div class="access-option">
-                <button class="btn-toggle" onclick="toggleHighContrast()" id="btn-contrast">
-                    <i class="fas fa-adjust"></i> Alto Contraste
-                </button>
-            </div>
-            <div class="access-option">
-                <button class="btn-toggle" onclick="toggleReadAloud()" id="btn-read">
-                    <i class="fas fa-volume-high"></i> Lector de Pantalla
-                </button>
-            </div>
-        </div>
-    </aside>
-
-    <!-- HEADER (se oculta en modo ciego voz) -->
-    <header role="banner">
-        <div class="logo">
-            <div class="logo-icon"><i class="fas fa-utensils"></i></div>
-            <div class="logo-text">
-                <h1>Menú Digital Accesible</h1>
-                <p>Inclusivo para todos &bull; Videos en Lengua de Señas &bull; Sin barreras</p>
-            </div>
-        </div>
-    </header>
-
-    <!-- CONTENEDOR PRINCIPAL (se oculta en modo ciego voz) -->
-    <main class="main-container">
-        
-        <!-- GRID DE PLATILLOS -->
-        <section class="menu-grid" aria-label="Catálogo de platillos">
-            <div class="section-header">
-                <h2 class="section-title">Nuestros Platillos</h2>
-                <p class="section-subtitle">Cada platillo incluye video informativo con lenguaje de señas, descripción detallada e ingredientes</p>
-            </div>
-
-            <!-- Platillos (8 artículos) -->
-            <article class="card" data-name="Tacos al Pastor" data-price="12.99">
-                <div class="card-image">
-                    <img src="assets/images/Taco.png" alt="Tacos al Pastor con carne de cerdo marinada, piña, cilantro y cebolla">
-                    <div class="card-overlay"><span class="price-tag">$12.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                    </div>
-                    <h3>Tacos al Pastor</h3>
-                    <p class="card-description">Tradicionales tacos de cerdo marinado con piña, cilantro y cebolla en tortilla de maíz.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Tacos al Pastor"
-                            data-precio="12.99"
-                            aria-label="Agregar Tacos al Pastor a la orden, precio 12 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Tacos al Pastor"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Tacos al Pastor en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Hamburguesa Clásica" data-price="14.99">
-                <div class="card-image">
-                    <img src="assets/images/Hamburguesa.png" alt="Hamburguesa clásica con carne de res, queso, lechuga y tomate">
-                    <div class="card-overlay"><span class="price-tag">$14.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                        <span class="badge egg"><i class="fas fa-egg"></i> Huevo</span>
-                    </div>
-                    <h3>Hamburguesa Clásica</h3>
-                    <p class="card-description">Jugosa hamburguesa de res con queso cheddar, lechuga fresca, tomate y cebolla.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Hamburguesa Clásica"
-                            data-precio="14.99"
-                            aria-label="Agregar Hamburguesa Clásica a la orden, precio 14 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Hamburguesa Clásica"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Hamburguesa Clásica en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Pizza Margarita" data-price="16.99">
-                <div class="card-image">
-                    <img src="assets/images/Pizza.png" alt="Pizza margarita con tomate, mozzarella y albahaca">
-                    <div class="card-overlay"><span class="price-tag">$16.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                    </div>
-                    <h3>Pizza Margarita</h3>
-                    <p class="card-description">Pizza italiana con masa artesanal, tomate, mozzarella di bufala y albahaca fresca.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Pizza Margarita"
-                            data-precio="16.99"
-                            aria-label="Agregar Pizza Margarita a la orden, precio 16 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Pizza Margarita"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pizza Margarita en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Sushi Roll California" data-price="18.99">
-                <div class="card-image">
-                    <img src="assets/images/Sushi.png" alt="Sushi roll california con cangrejo, aguacate y pepino">
-                    <div class="card-overlay"><span class="price-tag">$18.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge fish"><i class="fas fa-fish"></i> Pescado</span>
-                        <span class="badge soy"><i class="fas fa-leaf"></i> Soya</span>
-                        <span class="badge egg"><i class="fas fa-egg"></i> Huevo</span>
-                    </div>
-                    <h3>Sushi Roll California</h3>
-                    <p class="card-description">Roll de sushi con cangrejo, aguacate cremoso y pepino fresco.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Sushi Roll California"
-                            data-precio="18.99"
-                            aria-label="Agregar Sushi Roll California a la orden, precio 18 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Sushi Roll California"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Sushi Roll California en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Ensalada César" data-price="11.99">
-                <div class="card-image">
-                    <img src="assets/images/Ensalada.png" alt="Ensalada césar con lechuga, crutones y parmesano">
-                    <div class="card-overlay"><span class="price-tag">$11.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                        <span class="badge egg"><i class="fas fa-egg"></i> Huevo</span>
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                    </div>
-                    <h3>Ensalada César</h3>
-                    <p class="card-description">Lechuga romana con aderezo césar, crutones y queso parmesano.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Ensalada César"
-                            data-precio="11.99"
-                            aria-label="Agregar Ensalada César a la orden, precio 11 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Ensalada César"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Ensalada César en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Pasta Carbonara" data-price="15.99">
-                <div class="card-image">
-                    <img src="assets/images/Salsa Carbonara.png" alt="Pasta carbonara con panceta, huevo y queso">
-                    <div class="card-overlay"><span class="price-tag">$15.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                        <span class="badge egg"><i class="fas fa-egg"></i> Huevo</span>
-                        <span class="badge pork"><i class="fas fa-drumstick-bite"></i> Cerdo</span>
-                    </div>
-                    <h3>Pasta Carbonara</h3>
-                    <p class="card-description">Pasta italiana con panceta, huevo y queso parmesano.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Pasta Carbonara"
-                            data-precio="15.99"
-                            aria-label="Agregar Pasta Carbonara a la orden, precio 15 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Pasta Carbonara"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pasta Carbonara en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Pollo Teriyaki" data-price="17.99">
-                <div class="card-image">
-                    <img src="assets/images/Pollo Teriyaki.png" alt="Pollo teriyaki glaseado con salsa teriyaki">
-                    <div class="card-overlay"><span class="price-tag">$17.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge soy"><i class="fas fa-leaf"></i> Soya</span>
-                        <span class="badge gluten"><i class="fas fa-bread-slice"></i> Gluten</span>
-                    </div>
-                    <h3>Pollo Teriyaki</h3>
-                    <p class="card-description">Pechuga de pollo glaseada con salsa teriyaki casera.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Pollo Teriyaki"
-                            data-precio="17.99"
-                            aria-label="Agregar Pollo Teriyaki a la orden, precio 17 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Pollo Teriyaki"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pollo Teriyaki en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" data-name="Filete de Salmón" data-price="24.99">
-                <div class="card-image">
-                    <img src="assets/images/Filete de salmón.png" alt="Filete de salmón a la parrilla con limón">
-                    <div class="card-overlay"><span class="price-tag">$24.99</span></div>
-                </div>
-                <div class="card-body">
-                    <div class="allergen-badges">
-                        <span class="badge fish"><i class="fas fa-fish"></i> Pescado</span>
-                        <span class="badge dairy"><i class="fas fa-cheese"></i> Lácteos</span>
-                    </div>
-                    <h3>Filete de Salmón</h3>
-                    <p class="card-description">Salmón fresco a la parrilla con limón y hierbas.</p>
-                    <div class="card-actions">
-                        <button class="btn btn-primary"
-                            data-action="agregar"
-                            data-nombre="Filete de Salmón"
-                            data-precio="24.99"
-                            aria-label="Agregar Filete de Salmón a la orden, precio 24 dólares 99 centavos">
-                            <i class="fas fa-plus-circle"></i> Agregar
-                        </button>
-                        <button class="btn btn-secondary"
-                            data-action="video"
-                            data-nombre="Filete de Salmón"
-                            data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Filete de Salmón en lenguaje de señas">
-                            <i class="fas fa-play-circle"></i> Ver Video
-                        </button>
-                    </div>
-                </div>
-            </article>
-        </section>
-
-        <!-- SIDEBAR DE ORDEN (se oculta en modo ciego voz) -->
-        <aside class="sidebar" aria-label="Resumen de su orden">
-            <div class="order-box">
-                <h3><i class="fas fa-shopping-cart"></i> Su Orden</h3>
-                <p class="empty-msg" id="mensaje-vacio">No hay platillos seleccionados</p>
-                <div class="order-list" id="lista-orden"></div>
-                <div class="order-summary">
-                    <div class="total-row">
-                        <span>Total:</span>
-                        <span id="total-precio" aria-live="polite">$0.00</span>
-                    </div>
-                    <button class="btn btn-download"
-                        data-action="descargar"
-                        aria-label="Descargar orden en archivo de texto para mostrar al personal">
-                        <i class="fas fa-download"></i> Descargar Orden
-                    </button>
-                    <p class="help-text">Muestre esta pantalla al personal</p>
-                </div>
-            </div>
-        </aside>
-    </main>
-
-    <!-- MODAL DE VIDEO -->
-    <div class="video-modal" id="video-modal" aria-hidden="true" role="dialog" aria-labelledby="video-title">
-        <div class="modal-content">
-            <button class="close-modal" onclick="cerrarVideo()" aria-label="Cerrar video">
-                <i class="fas fa-times"></i>
-            </button>
-            <h2 id="video-title">Información del Platillo</h2>
-            <div class="video-badge">
-                <i class="fas fa-hands-asl-interpreting"></i> Incluye Lengua de Señas
-            </div>
-            <div class="video-container">
-                <iframe id="video-frame" src="" frameborder="0" allowfullscreen allow="autoplay" title="Video informativo del platillo"></iframe>
-            </div>
-            <div class="video-info">
-                <h3>Descripción Detallada</h3>
-                <p id="video-description">Cargando...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- BURBUJA PARA MODO CIEGO (solo visible en blind-voice-simplified) -->
-    <div id="blind-bubble" class="blind-bubble hidden">
-        <div class="bubble-outer-ring" id="bubble-outer-ring"></div>
-        <div class="bubble-circle" id="bubble-circle">
-            <div class="bubble-icon" id="bubble-icon">
-                <i class="fas fa-microphone" id="bubble-icon-glyph"></i>
-            </div>
-            <div class="bubble-waves" id="bubble-waves">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-        <div class="bubble-status" id="bubble-status">Toca para hablar</div>
-        <div class="bubble-text" id="bubble-text"></div>
-        <button class="bubble-tap-btn" id="bubble-tap-btn" onclick="activarVozCiego()" 
-                aria-label="Toca para hablar con el asistente">
-        </button>
-    </div>
-
-    <!-- CHATBOT (se usa como entrada/salida en modo ciego voz) -->
-    <div class="chatbot-container">
-        <button class="chatbot-toggle" onclick="toggleChatbot()" aria-expanded="false" aria-label="Abrir asistente virtual">
-            <i class="fas fa-headset"></i>
-            <span>Asistente Virtual</span>
-        </button>
-        
-        <div class="chatbot-window" id="chatbot-window" role="complementary" aria-label="Chat de asistente virtual">
-            <div class="chatbot-header">
-                <div class="chatbot-header-content">
-                    <div class="chatbot-avatar" aria-hidden="true"><i class="fas fa-robot"></i></div>
-                    <div class="chatbot-info">
-                        <h4>Asistente Virtual</h4>
-                        <span class="status-indicator">
-                            <span class="status-dot" aria-hidden="true"></span> En línea
-                        </span>
-                    </div>
-                </div>
-                <button class="chatbot-close" onclick="toggleChatbot()" aria-label="Cerrar chat">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="chatbot-messages" id="chatbot-messages" aria-live="polite" aria-label="Mensajes del chat">
-                <div class="message bot-message">
-                    <div class="message-content">
-                        <p>Bienvenido. Soy su asistente de pedido. ¿En qué puedo ayudarle hoy?</p>
-                        <span class="message-time">Ahora</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="chatbot-input-area">
-                <button class="mic-btn" id="mic-btn" onclick="activarVoz()" aria-label="Activar micrófono para dictado de voz" title="Hablar">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <input type="text" id="chatbot-input" placeholder="Escriba su mensaje aquí..." onkeypress="handleChatKeypress(event)" aria-label="Escribir mensaje al asistente">
-                <button class="send-btn" onclick="sendMessage()" aria-label="Enviar mensaje">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script src="js/script.js"></script>
-
-    <!-- Delegación de eventos para botones de acción (compatible con doble-tap) -->
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('[data-action]');
-            if (!btn) return;
-
-            const action = btn.dataset.action;
-            const label  = btn.getAttribute('aria-label') || btn.textContent.trim();
-
-            if (action === 'agregar') {
-                const nombre = btn.dataset.nombre;
-                const precio = parseFloat(btn.dataset.precio);
-                const fn = () => agregarAlCarrito(nombre, precio, 1);
-                blindTap(label, fn, e);
-            } else if (action === 'video') {
-                const nombre = btn.dataset.nombre;
-                const url    = btn.dataset.url;
-                const fn = () => abrirVideo(nombre, url);
-                blindTap(label, fn, e);
-            } else if (action === 'descargar') {
-                const fn = () => descargarOrden();
-                blindTap(label, fn, e);
-            }
-        });
+// ==========================================
+// CARRITO DE COMPRAS (soporta cantidades)
+// ==========================================
+function agregarAlCarrito(nombre, precio, cantidad = 1) {
+    if (cantidad <= 0) return;
+    const existente = orden.find(item => item.nombre === nombre && !item.custom?.removed.length && !item.custom?.added.length);
+    if (existente) {
+        existente.cantidad += cantidad;
+        total += precio * cantidad;
+    } else {
+        orden.push({ nombre, precio, cantidad, id: Date.now(), custom: { removed: [], added: [] } });
+        total += precio * cantidad;
+    }
+    document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
+    renderizarOrden();
+    if (isReadAloud) hablar(`${nombre} agregado a su orden (x${cantidad}).`);
+}
+function eliminarDelCarrito(id) {
+    const idx = orden.findIndex(i => i.id === id);
+    if (idx !== -1) {
+        const item = orden[idx];
+        total -= item.precio * item.cantidad;
+        orden.splice(idx, 1);
+        document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
+        renderizarOrden();
+    }
+}
+function renderizarOrden() {
+    const lista = document.getElementById('lista-orden');
+    const mensajeVacio = document.getElementById('mensaje-vacio');
+    lista.innerHTML = '';
+    if (orden.length === 0) {
+        mensajeVacio.style.display = 'block';
+        return;
+    }
+    mensajeVacio.style.display = 'none';
+    orden.forEach((item) => {
+        let extra = '';
+        if (item.custom.removed.length) extra += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) extra += ` (+${item.custom.added.join(', ')})`;
+        const div = document.createElement('div');
+        div.className = 'order-item';
+        div.innerHTML = `<span>${item.nombre} x${item.cantidad}${extra}</span>
+            <div class="order-item-right">
+                <span class="order-item-price">$${(item.precio*item.cantidad).toFixed(2)}</span>
+                <button class="btn-remove" onclick="eliminarDelCarrito(${item.id})"><i class="fas fa-times"></i></button>
+            </div>`;
+        lista.appendChild(div);
     });
-    </script>
-</body>
-</html>
+}
+function descargarOrden() {
+    if (orden.length === 0) { alert('Su orden está vacía.'); return; }
+    let texto = 'MI ORDEN\n' + '='.repeat(30) + '\n\n';
+    orden.forEach((item, i) => {
+        texto += `${i+1}. ${item.nombre} x${item.cantidad}`;
+        if (item.custom.removed.length) texto += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) texto += ` (+${item.custom.added.join(', ')})`;
+        texto += ` - $${(item.precio*item.cantidad).toFixed(2)}\n`;
+    });
+    texto += '\n' + '-'.repeat(30) + '\nTotal: $' + total.toFixed(2) + '\n\nMuestre esta pantalla al personal.';
+    const blob = new Blob([texto], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mi-orden.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (isReadAloud) hablar('Orden descargada. Muestre esta pantalla al personal.');
+}
+
+// ==========================================
+// VIDEO MODAL
+// ==========================================
+function abrirVideo(nombre, url) {
+    const modal = document.getElementById('video-modal');
+    document.getElementById('video-title').textContent = nombre;
+    document.getElementById('video-frame').src = url + '?autoplay=1';
+    document.getElementById('video-description').textContent = platillosData[nombre]?.desc || '';
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    if (isReadAloud) hablar(`Video informativo de ${nombre}.`);
+}
+function cerrarVideo() {
+    const modal = document.getElementById('video-modal');
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.getElementById('video-frame').src = '';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('video-modal').classList.contains('active')) cerrarVideo();
+});
+
+// ==========================================
+// ACCESIBILIDAD — lector de pantalla
+// ==========================================
+function toggleReadAloud() {
+    isReadAloud = !isReadAloud;
+    document.getElementById('btn-read').classList.toggle('active', isReadAloud);
+    if (isReadAloud) {
+        hablar('Lector de pantalla activado.');
+        document.addEventListener('click', leerElemento);
+    } else {
+        speechSynth.cancel();
+        document.removeEventListener('click', leerElemento);
+    }
+}
+function leerElemento(e) {
+    let texto = '';
+    const target = e.target;
+    if (target.closest('.card')) {
+        const card = target.closest('.card');
+        texto = `Platillo: ${card.dataset.name}. Precio: ${card.dataset.price} dólares.`;
+    } else if (target.closest('.btn-primary')) texto = 'Botón Agregar al carrito';
+    else if (target.closest('.btn-secondary')) texto = 'Botón Ver Video informativo';
+    if (texto) hablar(texto);
+}
+
+// ==========================================
+// PANTALLA DE BIENVENIDA Y SELECCIÓN DE MODO
+// ==========================================
+// Escucha de voz en la pantalla de selección (para modo ciego-reader sin TTS)
+let modoSeleccionRecognition = null;
+
+function iniciarMicSeleccion() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    if (modoSeleccionRecognition) return; // ya activo
+    const rec = new SpeechRecognition();
+    modoSeleccionRecognition = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+        const texto = e.results[e.results.length - 1][0].transcript.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (texto.includes('sin barrera') || texto.includes('uno') || texto.includes('1')) {
+            detenerMicSeleccion(); selectMode('default');
+        } else if (texto.includes('sordera') || texto.includes('hipoacusia') || texto.includes('dos') || texto.includes('2')) {
+            detenerMicSeleccion(); selectMode('deaf');
+        } else if (texto.includes('ceguera') || texto.includes('baja vision') || texto.includes('tres') || texto.includes('3')) {
+            detenerMicSeleccion(); selectMode('blind');
+        } else if (texto.includes('hablar') || texto.includes('barrera') || texto.includes('cuatro') || texto.includes('4')) {
+            detenerMicSeleccion(); selectMode('quiet');
+        }
+    };
+    rec.onerror = () => { modoSeleccionRecognition = null; };
+    rec.onend = () => { modoSeleccionRecognition = null; };
+    try { rec.start(); } catch(e) { modoSeleccionRecognition = null; }
+}
+
+function detenerMicSeleccion() {
+    if (modoSeleccionRecognition) {
+        try { modoSeleccionRecognition.stop(); } catch(e) {}
+        modoSeleccionRecognition = null;
+    }
+}
+
+function mostrarPantallaSeleccion() {
+    const welcomeEl = document.getElementById('welcome-overlay');
+    if (welcomeEl) {
+        welcomeEl.style.display = 'flex';
+        setTimeout(() => {
+            if (isReadAloud) speakWelcome();
+            // Cambio 5: Micrófono siempre activo en la pantalla de selección
+            iniciarMicSeleccion();
+        }, 300);
+    }
+}
+
+function speakWelcome() {
+    hablar("Bienvenido al menú digital accesible. Opción uno: Sin barrera de comunicación. Opción dos: Sordera o hipoacusia. Opción tres: Baja visión o ceguera. Opción cuatro: Barrera para hablar. Puede decirlo por voz o tocar el botón.");
+}
+function hideOverlay(id) {
+    const el = document.getElementById(id);
+    if (el) { el.classList.add('hidden'); setTimeout(() => el.remove(), 500); }
+}
+function selectMode(mode) {
+    speechSynth.cancel();
+    detenerMicSeleccion();
+    if (mode === 'blind') {
+        closeWelcome();
+        document.getElementById('blind-choice-overlay').style.display = 'flex';
+        return;
+    }
+    aplicarModo(mode);
+    closeWelcome();
+}
+function setBlindMode(choice) {
+    hideOverlay('blind-choice-overlay');
+    aplicarModo('blind', choice);
+    // Guardar elección en sessionStorage (persiste en recarga, no en cierre de pestaña)
+    sessionStorage.setItem('blindChoice', choice);
+}
+function aplicarModo(mode, blindChoice = null) {
+    // Guardar el modo en sessionStorage (persiste en recarga, no en cierre de pestaña)
+    sessionStorage.setItem('accessMode', mode);
+    switch (mode) {
+        case 'deaf':
+            document.querySelectorAll('.btn-secondary').forEach(b => { b.style.borderColor = '#2563EB'; b.style.background = '#DBEAFE'; });
+            break;
+        case 'blind':
+            if (!isHighContrast) toggleHighContrast();
+            document.documentElement.style.setProperty('--font-size-base', '20px');
+            if (blindChoice === 'voice') {
+                // TTS solo activo para modo voz
+                isReadAloud = true;
+                document.getElementById('btn-read').classList.add('active');
+                document.addEventListener('click', leerElemento);
+                activarModoCiego();
+                document.body.classList.add('blind-voice-simplified');
+                document.getElementById('blind-bubble').classList.remove('hidden');
+                // Mensaje de bienvenida enriquecido en el chatbot
+                const mensajes = document.getElementById('chatbot-messages');
+                mensajes.innerHTML = '';
+                addMessage("¡Hola! Soy su asistente de pedido. Estoy aquí para ayudarle a ordenar su comida. Puede decirme cosas como: «quiero 2 tacos al pastor», «¿qué ingredientes tiene la pizza?», «sin cebolla», «ver el total de mi orden» o «enviar mi orden». ¡Toque la burbuja en cualquier momento para hablar!", 'bot');
+                // Bienvenida de voz detallada
+                const mensajeBienvenida = "Hola, bienvenido. Soy su asistente de voz. Puedo ayudarle a pedir platillos, consultar ingredientes, personalizar su orden y enviarla al personal. Por ejemplo, puede decir: quiero dos tacos al pastor, o, ¿qué ingredientes tiene la hamburguesa? Toque la burbuja cuando quiera hablar. ¿Qué desea ordenar hoy?";
+                setTimeout(() => {
+                    actualizarBurbujaEstado('speaking', 'Escúchame...');
+                    hablar(mensajeBienvenida, () => {
+                        actualizarBurbujaEstado('idle', 'Toca para hablar');
+                        setTimeout(() => activarVozCiego(), 600);
+                    });
+                }, 500);
+            } else {
+                // Modo reader: TTS desactivado, solo alto contraste y texto grande
+                isReadAloud = false;
+                document.getElementById('btn-read').classList.remove('active');
+                document.removeEventListener('click', leerElemento);
+                // NO hablar aquí — el usuario usa su propio lector de pantalla
+            }
+            break;
+        case 'quiet':
+            closeWelcome();
+            setTimeout(() => { toggleChatbot(); setTimeout(() => document.getElementById('chatbot-input').focus(), 150); }, 300);
+            break;
+        default: break;
+    }
+}
+function activarModoCiego() {
+    isBlindMode = true;
+    document.body.classList.add('blind-mode');
+}
+
+// ==========================================
+// CONTROL DE BURBUJA MODO CIEGO
+// ==========================================
+function actualizarBurbujaEstado(estado, textoStatus) {
+    const circle = document.getElementById('bubble-circle');
+    const status = document.getElementById('bubble-status');
+    const glyph  = document.getElementById('bubble-icon-glyph');
+    if (!circle) return;
+    circle.classList.remove('speaking', 'listening', 'idle');
+    circle.classList.add(estado);
+    if (status) status.textContent = textoStatus || '';
+    if (glyph) {
+        if (estado === 'listening') {
+            glyph.className = 'fas fa-microphone';
+        } else if (estado === 'speaking') {
+            glyph.className = 'fas fa-volume-high';
+        } else {
+            glyph.className = 'fas fa-microphone';
+        }
+    }
+}
+
+// Versión especial de activarVoz para modo ciego (usa la burbuja)
+function activarVozCiego() {
+    if (!isBlindMode) { activarVoz(); return; }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        actualizarBurbujaEstado('idle', 'Voz no disponible');
+        hablar('Su navegador no soporta reconocimiento de voz. Por favor escriba su pedido.');
+        return;
+    }
+    // Si ya está escuchando, detener
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+        actualizarBurbujaEstado('idle', 'Toca para hablar');
+        return;
+    }
+    speechSynth.cancel();
+    const recognition = new SpeechRecognition();
+    recognitionInstance = recognition;
+    recognition.lang = 'es-MX';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    actualizarBurbujaEstado('listening', 'Escuchando...');
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        recognitionInstance = null;
+        actualizarBurbujaEstado('speaking', 'Procesando...');
+        document.getElementById('chatbot-input').value = transcript;
+        // Procesar y responder
+        addMessage(transcript, 'user');
+        const respuesta = processBotMessageLocal(transcript);
+        setTimeout(() => {
+            addMessage(respuesta, 'bot');
+            actualizarBurbujaEstado('speaking', 'Respondiendo...');
+            hablar(respuesta, () => {
+                actualizarBurbujaEstado('idle', 'Toca para hablar');
+                // Reactivar escucha automáticamente
+                setTimeout(() => activarVozCiego(), 800);
+            });
+        }, 400);
+    };
+    recognition.onerror = (event) => {
+        console.error('Mic error:', event.error);
+        recognitionInstance = null;
+        actualizarBurbujaEstado('idle', 'Toca para hablar');
+        hablar('No escuché bien. Toque la burbuja para intentar de nuevo.');
+    };
+    recognition.onend = () => {
+        if (recognitionInstance === recognition) {
+            recognitionInstance = null;
+            actualizarBurbujaEstado('idle', 'Toca para hablar');
+        }
+    };
+    setTimeout(() => {
+        try { recognition.start(); } catch(err) {
+            recognitionInstance = null;
+            actualizarBurbujaEstado('idle', 'Toca para hablar');
+        }
+    }, 100);
+}
+function closeWelcome() { hideOverlay('welcome-overlay'); }
+
+// ==========================================
+// FUNCIÓN PARA DESACTIVAR TTS (botón en bienvenida)
+// ==========================================
+function desactivarTTS() {
+    speechSynth.cancel();
+    isReadAloud = false;
+    document.getElementById('btn-read').classList.remove('active');
+    document.removeEventListener('click', leerElemento);
+    // Opcional: desactivar micrófono también
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+        document.getElementById('mic-btn').classList.remove('listening');
+    }
+}
+
+// ==========================================
+// CHATBOT (bot local mejorado)
+// ==========================================
+function toggleChatbot() {
+    const win = document.getElementById('chatbot-window');
+    const btn = document.querySelector('.chatbot-toggle');
+    win.classList.toggle('active');
+    btn.setAttribute('aria-expanded', win.classList.contains('active'));
+    if (win.classList.contains('active')) setTimeout(() => document.getElementById('chatbot-input').focus(), 100);
+}
+function sendMessage() {
+    const input = document.getElementById('chatbot-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    addMessage(msg, 'user');
+    input.value = '';
+    const respuesta = processBotMessageLocal(msg);
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
+}
+const numerosTexto = { 'un':1, 'uno':1, 'una':1, 'dos':2, 'tres':3, 'cuatro':4, 'cinco':5, 'seis':6, 'siete':7, 'ocho':8, 'nueve':9, 'diez':10 };
+function extraerCantidad(texto) {
+    const matchNum = texto.match(/\b(\d+)\b/);
+    if (matchNum) return parseInt(matchNum[0]);
+    for (let p in numerosTexto) if (texto.includes(p)) return numerosTexto[p];
+    return 1;
+}
+function processBotMessageLocal(message) {
+    const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    // Comando para desactivar asistente de voz
+    if (msg.includes('desactivar asistente de voz') || msg.includes('silencio')) {
+        desactivarTTS();
+        // Detener micrófono activo
+        if (recognitionInstance) {
+            try { recognitionInstance.stop(); } catch(e) {}
+            recognitionInstance = null;
+            document.getElementById('mic-btn').classList.remove('listening');
+        }
+        return "Asistente de voz desactivado.";
+    }
+    // Saludos
+    if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches/)) {
+        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes.";
+    }
+    // Menú
+    if (msg.match(/menu|platillos|comida|que tiene|opciones/)) {
+        let menu = "Platillos disponibles:\n";
+        for (let nombre in platillosData) menu += `- ${nombre}: $${platillosData[nombre].price}\n`;
+        return menu + "Puedes pedir uno o varios con cantidad, ej. '3 tacos'.";
+    }
+    // Ingredientes
+    if (msg.match(/ingredientes|que contiene|que lleva/i)) {
+        for (let nombre in platillosData) {
+            if (msg.includes(nombre.toLowerCase())) {
+                return `Los ingredientes de ${nombre} son: ${platillosData[nombre].ingredients.join(', ')}. ¿Deseas quitar o agregar algo?`;
+            }
+        }
+        return "Dime de qué platillo quieres saber los ingredientes.";
+    }
+    // Modificar ingrediente
+    const mod = msg.match(/(quitar|sin|eliminar?)\s+([\w\s]+?)(?:\s+(de|del)\s+(.+))?$/);
+    if (mod) return modificarIngrediente(mod[2].trim(), 'quitar', mod[4]?.trim());
+    const add = msg.match(/(agregar|añadir|poner|con)\s+([\w\s]+?)(?:\s+(a|en|al)\s+(.+))?$/);
+    if (add) return modificarIngrediente(add[2].trim(), 'agregar', add[4]?.trim());
+    // Pedido con cantidad
+    const cantidad = extraerCantidad(msg);
+    for (let nombre in platillosData) {
+        if (msg.includes(nombre.toLowerCase())) {
+            agregarAlCarrito(nombre, platillosData[nombre].price, cantidad);
+            return `He añadido ${cantidad} ${nombre} a tu orden. ¿Algo más?`;
+        }
+    }
+    // Resumen / cuenta
+    if (msg.match(/total|cuenta|resumen|orden/)) {
+        if (orden.length === 0) return "Tu orden está vacía.";
+        let resumen = "Tu orden:\n";
+        orden.forEach(i => resumen += `- ${i.nombre} x${i.cantidad} $${(i.precio*i.cantidad).toFixed(2)}\n`);
+        return resumen + `Total: $${total.toFixed(2)}`;
+    }
+    // Enviar / descargar
+    if (msg.match(/enviar|descargar|pagar|finalizar|listo/)) {
+        if (orden.length === 0) return "No hay nada que enviar.";
+        setTimeout(() => descargarOrden(), 1000);
+        return "Descargando tu orden. Muestra el archivo al personal.";
+    }
+    // Ayuda
+    if (msg.match(/ayuda|que puedo hacer|como funciona/)) {
+        return "Puedes pedir platillos (ej. '2 tacos'), preguntar ingredientes, quitar/agregar ingredientes (ej. 'sin queso'), ver el total o enviar tu orden.";
+    }
+    return "No entendí. Puedes pedir algo como '2 tacos al pastor' o preguntar 'ingredientes de la pizza'.";
+}
+function modificarIngrediente(ingrediente, accion, platilloRef) {
+    let item = null;
+    if (platilloRef) {
+        for (let p in platillosData) if (p.toLowerCase().includes(platilloRef)) { item = orden.find(i => i.nombre === p); break; }
+    } else item = orden[orden.length-1];
+    if (!item) return "No encuentro ese platillo en tu orden.";
+    if (!item.custom) item.custom = { removed: [], added: [] };
+    if (accion === 'quitar') {
+        if (!item.custom.removed.includes(ingrediente)) item.custom.removed.push(ingrediente);
+        item.custom.added = item.custom.added.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He quitado "${ingrediente}" de ${item.nombre}.`;
+    } else {
+        if (!item.custom.added.includes(ingrediente)) item.custom.added.push(ingrediente);
+        item.custom.removed = item.custom.removed.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He añadido "${ingrediente}" a ${item.nombre}.`;
+    }
+}
+function addMessage(text, sender) {
+    const cont = document.getElementById('chatbot-messages');
+    const div = document.createElement('div');
+    div.className = `message ${sender}-message`;
+    div.innerHTML = `<div class="message-content"><p>${text}</p><span class="message-time">${new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</span></div>`;
+    cont.appendChild(div);
+    cont.scrollTop = cont.scrollHeight;
+}
+function scrollChatToBottom() {
+    const c = document.getElementById('chatbot-messages');
+    if (c) c.scrollTop = c.scrollHeight;
+}
+function handleChatKeypress(event) { if (event.key === 'Enter') sendMessage(); }
+
+// ==========================================
+// RECONOCIMIENTO DE VOZ (activación automática al cargar)
+// ==========================================
+let recognitionInstance = null;
+function activarVoz() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('mic-btn');
+    if (!SpeechRecognition) { addMessage('Navegador no soporta reconocimiento de voz.', 'bot'); return; }
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        return;
+    }
+    const chatWindow = document.getElementById('chatbot-window');
+    if (!chatWindow.classList.contains('active')) toggleChatbot();
+    speechSynth.cancel();
+    const recognition = new SpeechRecognition();
+    recognitionInstance = recognition;
+    recognition.lang = 'es-MX';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    micBtn.classList.add('listening');
+    micBtn.setAttribute('aria-label', 'Escuchando... toque para detener');
+    // Activar animación de burbuja escuchando
+    const bubble = document.getElementById('bubble-circle');
+    if (bubble) bubble.classList.add('listening');
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        if (bubble) bubble.classList.remove('listening');
+        document.getElementById('chatbot-input').value = transcript;
+        enviarMensajeDirecto(transcript);
+    };
+    recognition.onerror = (event) => {
+        console.error('Mic error:', event.error);
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        if (bubble) bubble.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        addMessage('Error con el micrófono. Puedes escribir tu mensaje.', 'bot');
+    };
+    recognition.onend = () => {
+        if (recognitionInstance === recognition) {
+            recognitionInstance = null;
+            micBtn.classList.remove('listening');
+            if (bubble) bubble.classList.remove('listening');
+            micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        }
+    };
+    setTimeout(() => {
+        try { recognition.start(); } catch (err) {
+            recognitionInstance = null;
+            micBtn.classList.remove('listening');
+            if (bubble) bubble.classList.remove('listening');
+        }
+    }, 150);
+}
+function enviarMensajeDirecto(texto) {
+    if (!texto.trim()) return;
+    document.getElementById('chatbot-input').value = '';
+    addMessage(texto, 'user');
+    const respuesta = processBotMessageLocal(texto);
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
+}
+
+// ==========================================
+// UTILIDADES DE ACCESIBILIDAD
+// ==========================================
+function toggleAccessPanel() {
+    document.getElementById('panel-content').classList.toggle('active');
+    document.querySelector('.toggle-panel').setAttribute('aria-expanded', document.getElementById('panel-content').classList.contains('active'));
+}
+function changeFontSize(delta) {
+    const curr = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base')) || 16;
+    let size = delta === 0 ? 16 : Math.max(12, Math.min(24, curr + delta));
+    document.documentElement.style.setProperty('--font-size-base', size + 'px');
+    if (isReadAloud) hablar(`Tamaño de texto: ${size} puntos.`);
+}
+function toggleHighContrast() {
+    isHighContrast = !isHighContrast;
+    document.body.classList.toggle('high-contrast', isHighContrast);
+    document.getElementById('btn-contrast').classList.toggle('active', isHighContrast);
+    if (isReadAloud) hablar(isHighContrast ? 'Alto contraste activado.' : 'Alto contraste desactivado.');
+}
+
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.card').forEach((card, i) => {
+        card.style.opacity = '0'; card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            card.style.opacity = '1'; card.style.transform = 'translateY(0)';
+        }, i * 80);
+    });
+
+    // Cambio 3: Restaurar sesión si la página se recargó (sessionStorage persiste en recarga,
+    // pero se borra al cerrar la pestaña — exactamente el comportamiento pedido)
+    const savedMode = sessionStorage.getItem('accessMode');
+    const savedBlindChoice = sessionStorage.getItem('blindChoice');
+
+    if (savedMode) {
+        // La persona ya eligió antes en esta sesión (recarga) — restaurar directamente
+        if (savedMode === 'blind' && savedBlindChoice) {
+            aplicarModo('blind', savedBlindChoice);
+        } else {
+            aplicarModo(savedMode);
+        }
+        // No mostrar pantalla de selección
+    } else {
+        // Primera visita o pestaña nueva — mostrar pantalla de selección
+        setTimeout(() => mostrarPantallaSeleccion(), 400);
+    }
+});
