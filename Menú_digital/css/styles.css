@@ -864,6 +864,11 @@ header {
     position: relative;
 }
 
+/* Ensure speak button has enough top space to clear the absolute mute button */
+.welcome-modal .welcome-speak {
+    margin-top: 44px;
+}
+
 .welcome-skip {
     background: none;
     border: none;
@@ -1586,6 +1591,16 @@ body.blind-mode .video-info {
     .welcome-speak {
         padding: 10px 16px;
         font-size: 0.85rem;
+        /* Ensure it doesn't overlap with the absolute mute button */
+        margin-top: 52px;
+        margin-bottom: 20px;
+    }
+    /* Fix for mute button overlapping speak-instructions on mobile */
+    .btn-mute-tts {
+        top: 12px;
+        right: 12px;
+        padding: 6px 12px;
+        font-size: 0.78rem;
     }
     .chatbot-window {
         width: calc(100vw - 12px);
