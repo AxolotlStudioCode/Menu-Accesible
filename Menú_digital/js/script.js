@@ -2,7 +2,7 @@
 // VARIABLES GLOBALES
 // ==========================================
 let total = 0;
-let orden = [];
+let orden = [];   // ahora los objetos tienen: { nombre, precio, cantidad, id, custom: { removed: [], added: [] } }
 let isReadAloud = false;
 let isHighContrast = false;
 let isBlindMode = false;
@@ -11,9 +11,6 @@ let speechSynth = window.speechSynthesis;
 // Sistema de doble-tap para modo ciego (sin toast visual)
 let pendingAction = null;
 let pendingTimeout = null;
-
-// Historial del chat (para el bot local, ya no se usa API externa)
-let chatHistory = [];  // Se conserva por si más adelante se reactiva la API
 
 // Datos de platillos
 const platillosData = {
@@ -74,7 +71,6 @@ function hablar(texto, onEnd) {
 
 // ==========================================
 // SISTEMA DE DOBLE-TAP PARA MODO CIEGO
-// (sin toast visual, solo confirmación por voz)
 // ==========================================
 function blindTap(label, fn, event) {
     if (!isBlindMode) {
@@ -103,25 +99,39 @@ function blindTap(label, fn, event) {
 function clearPendingAction() {
     if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
     pendingAction = null;
-    // No se crean toasts visuales
 }
 
 // ==========================================
-// CARRITO DE COMPRAS
+// CARRITO DE COMPRAS (soporta cantidades)
 // ==========================================
-function agregarAlCarrito(nombre, precio) {
-    total += precio;
-    orden.push({ nombre, precio, id: Date.now() });
+function agregarAlCarrito(nombre, precio, cantidad = 1) {
+    if (cantidad <= 0) return;
+    // Buscar si ya existe el mismo platillo sin personalizaciones para acumular
+    const existente = orden.find(item => item.nombre === nombre && !item.custom?.removed.length && !item.custom?.added.length);
+    if (existente) {
+        existente.cantidad += cantidad;
+        total += precio * cantidad;
+    } else {
+        orden.push({
+            nombre,
+            precio,
+            cantidad,
+            id: Date.now(),
+            custom: { removed: [], added: [] }
+        });
+        total += precio * cantidad;
+    }
     document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
     renderizarOrden();
-    if (isReadAloud) hablar(`${nombre} agregado a su orden. Precio: ${precio} dólares.`);
+    if (isReadAloud) hablar(`${nombre} agregado a su orden (x${cantidad}).`);
 }
 
 function eliminarDelCarrito(id) {
-    const item = orden.find(i => i.id === id);
-    if (item) {
-        total -= item.precio;
-        orden = orden.filter(i => i.id !== id);
+    const idx = orden.findIndex(i => i.id === id);
+    if (idx !== -1) {
+        const item = orden[idx];
+        total -= item.precio * item.cantidad;
+        orden.splice(idx, 1);
         document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
         renderizarOrden();
     }
@@ -140,10 +150,13 @@ function renderizarOrden() {
         const div = document.createElement('div');
         div.className = 'order-item';
         div.setAttribute('role', 'listitem');
+        let extra = '';
+        if (item.custom.removed.length) extra += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) extra += ` (+${item.custom.added.join(', ')})`;
         div.innerHTML = `
-            <span>${item.nombre}</span>
+            <span>${item.nombre} x${item.cantidad}${extra}</span>
             <div class="order-item-right">
-                <span class="order-item-price">$${item.precio.toFixed(2)}</span>
+                <span class="order-item-price">$${(item.precio * item.cantidad).toFixed(2)}</span>
                 <button class="btn-remove"
                     aria-label="Eliminar ${item.nombre} de la orden"
                     title="Eliminar"
@@ -163,7 +176,10 @@ function descargarOrden() {
     }
     let texto = 'MI ORDEN\n' + '='.repeat(30) + '\n\n';
     orden.forEach((item, i) => {
-        texto += `${i + 1}. ${item.nombre} - $${item.precio.toFixed(2)}\n`;
+        texto += `${i + 1}. ${item.nombre} x${item.cantidad}`;
+        if (item.custom.removed.length) texto += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) texto += ` (+${item.custom.added.join(', ')})`;
+        texto += ` - $${(item.precio * item.cantidad).toFixed(2)}\n`;
     });
     texto += '\n' + '-'.repeat(30) + '\n';
     texto += `Total: $${total.toFixed(2)}\n\nGracias por su preferencia.\nMuestre esta pantalla al personal.`;
@@ -265,9 +281,9 @@ function selectMode(mode) {
 
     if (mode === 'blind') {
         // En lugar de aplicar cambios automáticos, mostramos el diálogo de elección
-        closeWelcome(); // cierra la bienvenida
+        closeWelcome();
         document.getElementById('blind-choice-overlay').style.display = 'flex';
-        return; // La configuración del modo ciego se hará en setBlindMode()
+        return;
     }
 
     // Otros modos se aplican directamente
@@ -301,17 +317,21 @@ function aplicarModo(mode, blindChoice = null) {
                 isReadAloud = true;
                 document.getElementById('btn-read').classList.add('active');
                 document.addEventListener('click', leerElemento);
-                activarModoCiego(); // modo doble-tap y foco
-                // Interfaz simplificada
+                activarModoCiego();
+                // Interfaz simplificada centrada
                 document.body.classList.add('blind-voice-simplified');
-                // Abrir chatbot automáticamente y empezar a escuchar
+                // Abrir chatbot automáticamente y mostrar mensaje de bienvenida
                 const chatWindow = document.getElementById('chatbot-window');
                 if (!chatWindow.classList.contains('active')) toggleChatbot();
-                // Mensaje de bienvenida del asistente por voz
-                hablar('Modo asistente de voz activado. Puede hablarme para hacer su pedido.');
+                // Limpiamos mensajes anteriores y ponemos el saludo inicial
+                const mensajes = document.getElementById('chatbot-messages');
+                mensajes.innerHTML = '';
+                const bienvenida = "Bienvenido al menú, ¿qué desea ordenar? Puede preguntarme por los platillos y sus ingredientes así como agregar a la orden.";
+                addMessage(bienvenida, 'bot');
+                if (isReadAloud) hablar(bienvenida);
                 // Activar el micrófono automáticamente tras un breve retraso
                 setTimeout(() => {
-                    activarVoz(); // comienza la escucha
+                    activarVoz();
                 }, 800);
             } else {
                 // Usar lector de pantalla: solo mejoras visuales, sin TTS forzado
@@ -325,13 +345,12 @@ function aplicarModo(mode, blindChoice = null) {
             break;
 
         case 'quiet':
-            // Barrera para hablar: chatbot abierto, sin más
             closeWelcome();
             setTimeout(() => {
                 toggleChatbot();
                 setTimeout(() => { document.getElementById('chatbot-input').focus(); }, 150);
             }, 300);
-            return; // closeWelcome ya se llamó dentro de selectMode para otros, pero aquí lo aseguramos
+            return;
 
         default:
             // default: sin cambios adicionales
@@ -360,11 +379,8 @@ function closeWelcome() {
 }
 
 // ==========================================
-// CHATBOT (usando SOLO el bot local)
+// CHATBOT (bot local mejorado con cantidades e ingredientes)
 // ==========================================
-// La API de Gemini ha sido eliminada para evitar riesgos de seguridad.
-// El asistente funciona completamente sin conexión con processBotMessageLocal().
-
 function toggleChatbot() {
     const chatWindow = document.getElementById('chatbot-window');
     const btn = document.querySelector('.chatbot-toggle');
@@ -381,115 +397,132 @@ function sendMessage() {
     if (message === '') return;
     addMessage(message, 'user');
     input.value = '';
-    // Llamada directa al bot local (sin API)
     const respuesta = processBotMessageLocal(message);
-    // Simulamos un pequeño delay para que parezca que "piensa"
     setTimeout(() => {
         addMessage(respuesta, 'bot');
         if (isReadAloud) hablar(respuesta);
     }, 600);
 }
 
-// ==========================================
-// BOT LOCAL DE RESPUESTA (mejorado)
-// ==========================================
+// Mapeo de palabras numéricas a dígitos (hasta diez)
+const numerosTexto = {
+    'un':1, 'uno':1, 'una':1, 'dos':2, 'tres':3, 'cuatro':4, 'cinco':5, 'seis':6, 'siete':7, 'ocho':8, 'nueve':9, 'diez':10
+};
+function extraerCantidad(texto) {
+    // Buscar dígito
+    const matchNum = texto.match(/\b(\d+)\b/);
+    if (matchNum) return parseInt(matchNum[0]);
+    // Buscar palabra numérica
+    for (let palabra in numerosTexto) {
+        if (texto.includes(palabra)) return numerosTexto[palabra];
+    }
+    return 1; // por defecto
+}
+
 function processBotMessageLocal(message) {
     const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+    // Saludos
     if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches/)) {
-        return "¡Hola! Soy tu asistente virtual. Puedes pedirme el menú, consultar precios o hacer tu pedido directamente.";
-    }
-    if (msg.match(/recomienda|sugieres|mejor|rico/)) {
-        return "Te recomiendo los Tacos al Pastor o la Hamburguesa Clásica. ¿Cuál te gustaría ordenar?";
+        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes.";
     }
 
-    if (msg.match(/menu|carta|opciones|comida|que hay|tienen/)) {
-        return "Tenemos: Tacos al Pastor ($12.99), Hamburguesa Clásica ($14.99), Pizza Margarita ($16.99), Sushi Roll ($18.99), Ensalada César ($11.99), Pasta Carbonara ($15.99), Pollo Teriyaki ($17.99) y Filete de Salmón ($24.99).";
+    // Pregunta por ingredientes
+    const matchIngred = msg.match(/ingredientes|que contiene|que lleva/i);
+    if (matchIngred) {
+        for (let nombre in platillosData) {
+            const regex = new RegExp(nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""), 'i');
+            if (msg.match(regex)) {
+                const ingr = platillosData[nombre].ingredients.join(', ');
+                return `Los ingredientes de ${nombre} son: ${ingr}. Si deseas quitar o agregar algo, indícalo (ej. "sin queso" o "agregar aguacate").`;
+            }
+        }
+        return "Por favor, dime de qué platillo quieres saber los ingredientes.";
     }
 
-    const esPregunta = msg.match(/precio|cuesta|cuestan|vale|valen|ingredientes|lleva|contiene|que es|informacion|alergenos/);
-
-    if (esPregunta) {
-        if (msg.match(/taco|pastor|tacos/)) return "Los Tacos al Pastor cuestan $12.99 y llevan: Carne de cerdo, piña, cilantro, cebolla y tortillas de maíz.";
-        if (msg.match(/hamburguesa|burger/)) return "La Hamburguesa Clásica cuesta $14.99 e incluye res premium, queso cheddar, lechuga, tomate, cebolla, pepinillos y salsas.";
-        if (msg.match(/pizza|margarita/)) return "La Pizza Margarita cuesta $16.99. Sus ingredientes son masa artesanal, tomates, mozzarella y albahaca fresca.";
-        if (msg.match(/sushi|california|rollo/)) return "El Sushi Roll cuesta $18.99. Lleva arroz, alga nori, cangrejo, aguacate, pepino y mayonesa picante.";
-        if (msg.match(/ensalada|cesar/)) return "La Ensalada César cuesta $11.99. Lleva lechuga romana, parmesano, huevo, crutones y aderezo césar.";
-        if (msg.match(/pasta|carbonara|espagueti|spaghetti/)) return "La Pasta Carbonara cuesta $15.99 y se prepara con espagueti, panceta, queso pecorino y huevo.";
-        if (msg.match(/pollo|teriyaki/)) return "El Pollo Teriyaki tiene un precio de $17.99. Incluye pechuga glaseada, arroz al vapor y vegetales.";
-        if (msg.match(/salmon|filete/)) return "El Filete de Salmón vale $24.99 y viene acompañado de puré de papa y espárragos al vapor.";
-
-        return "Si deseas saber el precio o ingredientes de un platillo, menciona su nombre (ej. 'precio de los tacos').";
+    // Comando para modificar un platillo (quitar/agregar ingrediente)
+    const modificar = msg.match(/(quitar|sin|eliminar?)\s+([\w\s]+?)(?:\s+(de|del)\s+(.+))?$/);
+    if (modificar) {
+        const ingrediente = modificar[2].trim();
+        const platilloRef = modificar[4] ? modificar[4].trim() : null;
+        return modificarIngrediente(ingrediente, 'quitar', platilloRef);
+    }
+    const agregar = msg.match(/(agregar|añadir|poner|con)\s+([\w\s]+?)(?:\s+(a|en|al)\s+(.+))?$/);
+    if (agregar) {
+        const ingrediente = agregar[2].trim();
+        const platilloRef = agregar[4] ? agregar[4].trim() : null;
+        return modificarIngrediente(ingrediente, 'agregar', platilloRef);
     }
 
-    let platilloAgregado = false;
-    let respuesta = "";
-
-    if (msg.match(/taco|pastor|tacos/)) {
-        agregarAlCarrito('Tacos al Pastor', 12.99);
-        respuesta = "¡Excelente! He agregado unos Tacos al Pastor a tu orden. ";
-        platilloAgregado = true;
+    // Pedido con cantidad (soporta números y palabras)
+    const cantidad = extraerCantidad(msg);
+    let platilloEncontrado = null;
+    for (let nombre in platillosData) {
+        const regex = new RegExp(nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""), 'i');
+        if (msg.match(regex)) {
+            platilloEncontrado = nombre;
+            break;
+        }
     }
-    else if (msg.match(/hamburguesa|burger/)) {
-        agregarAlCarrito('Hamburguesa Clásica', 14.99);
-        respuesta = "¡Listo! Una Hamburguesa Clásica agregada a tu carrito. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/pizza|margarita/)) {
-        agregarAlCarrito('Pizza Margarita', 16.99);
-        respuesta = "¡Marchando una Pizza Margarita! Ya está en tu orden. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/sushi|california|rollo/)) {
-        agregarAlCarrito('Sushi Roll California', 18.99);
-        respuesta = "Sushi Roll California agregado a tu cuenta. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/ensalada|cesar/)) {
-        agregarAlCarrito('Ensalada César', 11.99);
-        respuesta = "Ensalada César agregada. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/pasta|carbonara|espagueti|spaghetti/)) {
-        agregarAlCarrito('Pasta Carbonara', 15.99);
-        respuesta = "Pasta Carbonara en tu carrito. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/pollo|teriyaki/)) {
-        agregarAlCarrito('Pollo Teriyaki', 17.99);
-        respuesta = "Pollo Teriyaki añadido. ";
-        platilloAgregado = true;
-    }
-    else if (msg.match(/salmon|filete/)) {
-        agregarAlCarrito('Filete de Salmón', 24.99);
-        respuesta = "Filete de Salmón agregado. ";
-        platilloAgregado = true;
+    if (platilloEncontrado) {
+        agregarAlCarrito(platilloEncontrado, platillosData[platilloEncontrado].price, cantidad);
+        return `He añadido ${cantidad} ${platilloEncontrado} a tu orden. ¿Algo más?`;
     }
 
-    if (platilloAgregado) {
-        return respuesta + "¿Deseas algo más o preparo la cuenta?";
+    // Peticiones de total, cuenta, etc.
+    if (msg.match(/total|cuenta|llevo|pedido|orden|resumen|cuanto es/)) {
+        if (orden.length === 0) return "Tu orden está vacía.";
+        let resumen = `Tu orden actual:\n`;
+        orden.forEach(item => {
+            resumen += `- ${item.nombre} x${item.cantidad} $${(item.precio * item.cantidad).toFixed(2)}\n`;
+        });
+        resumen += `Total: $${total.toFixed(2)}`;
+        return resumen;
     }
 
-    if (msg.match(/total|cuenta|llevo|pedido|orden|cuanto es/)) {
-        if (orden.length === 0) return "Tu orden está vacía en este momento. ¿Te sirvo algo?";
-        return `Llevas ${orden.length} platillos. El total es de $${total.toFixed(2)}. Si ya terminaste, di "descargar orden" o "pagar".`;
+    if (msg.match(/descargar|pagar|finalizar|enviar|terminar|listo|ya/)) {
+        if (orden.length === 0) return "No hay nada que descargar.";
+        setTimeout(() => descargarOrden(), 1000);
+        return "Descargando tu orden. Muestra el archivo al personal.";
     }
 
     if (msg.match(/quitar|eliminar|borrar|cancelar/)) {
         return "Para quitar un platillo de tu orden, usa el botón con la 'X' roja que está junto al precio en tu carrito visual.";
     }
 
-    if (msg.match(/descargar|pagar|terminar|finalizar|listo|ya/)) {
-        if (orden.length === 0) return "No puedes finalizar porque no has pedido nada aún. ¿Qué te ofrezco?";
-        setTimeout(() => descargarOrden(), 1000);
-        return "¡Perfecto! Estoy descargando el recibo de tu orden. Por favor, muestra el archivo en pantalla al personal.";
-    }
+    return "No entendí. Puedes pedir algo como '2 tacos al pastor' o preguntar 'ingredientes de la pizza'.";
+}
 
-    if (msg.match(/gracias|ok|va|bien|perfecto/)) {
-        return "¡Con gusto! Aquí sigo si necesitas agregar algo más.";
+// Función auxiliar para modificar ingredientes
+function modificarIngrediente(ingrediente, accion, platilloRef) {
+    // Buscar el platillo en la orden (el último agregado o el especificado)
+    let item = null;
+    if (platilloRef) {
+        for (let p in platillosData) {
+            if (p.toLowerCase().includes(platilloRef)) {
+                item = orden.find(it => it.nombre === p);
+                break;
+            }
+        }
+    } else {
+        // Tomar el último agregado
+        item = orden[orden.length - 1];
     }
-
-    return "No te entendí muy bien. Puedes preguntarme '¿qué lleva el sushi?' o pedir directamente 'quiero unos tacos'.";
+    if (!item) return "No encuentro ese platillo en tu orden actual.";
+    if (accion === 'quitar') {
+        if (!item.custom) item.custom = { removed: [], added: [] };
+        if (!item.custom.removed.includes(ingrediente)) item.custom.removed.push(ingrediente);
+        item.custom.added = item.custom.added.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He quitado "${ingrediente}" de ${item.nombre}. Tu orden se ha actualizado.`;
+    } else if (accion === 'agregar') {
+        if (!item.custom) item.custom = { removed: [], added: [] };
+        if (!item.custom.added.includes(ingrediente)) item.custom.added.push(ingrediente);
+        item.custom.removed = item.custom.removed.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He añadido "${ingrediente}" a ${item.nombre}. Tu orden se ha actualizado.`;
+    }
+    return "¿Qué deseas modificar?";
 }
 
 function addMessage(text, sender) {
@@ -568,12 +601,12 @@ function activarVoz() {
         micBtn.classList.remove('listening');
         micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
         const msgs = {
-            'not-allowed': 'Permiso de micrófono denegado. Habilítelo en los ajustes del navegador e intente de nuevo.',
-            'permission-denied': 'Permiso de micrófono denegado.',
-            'no-speech': 'No escuché nada. Intente de nuevo.',
-            'audio-capture': 'No se encontró micrófono.',
-            'network': 'Error de red. Verifique su conexión.',
-            'aborted': 'Micrófono cancelado.',
+            'not-allowed':        'Permiso de micrófono denegado. Habilítelo en los ajustes del navegador e intente de nuevo.',
+            'permission-denied':  'Permiso de micrófono denegado.',
+            'no-speech':          'No escuché nada. Intente de nuevo.',
+            'audio-capture':      'No se encontró micrófono.',
+            'network':            'Error de red. Verifique su conexión.',
+            'aborted':            'Micrófono cancelado.',
         };
         const msg = msgs[event.error] || `Error de micrófono (${event.error}). Intente escribir su mensaje.`;
         addMessage(msg, 'bot');
@@ -604,7 +637,6 @@ function enviarMensajeDirecto(texto) {
     if (!texto || texto.trim() === '') return;
     document.getElementById('chatbot-input').value = '';
     addMessage(texto, 'user');
-    // Usar solo el bot local
     const respuesta = processBotMessageLocal(texto);
     setTimeout(() => {
         addMessage(respuesta, 'bot');
@@ -662,6 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(iniciarVozBienvenida, 800);
     document.addEventListener('pointerdown', iniciarVozBienvenida, { once: true });
 
-    // Limpiar modo guardado
+    // Limpiar modo guardado para elegir cada vez
     localStorage.removeItem('accessMode');
 });
