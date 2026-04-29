@@ -499,8 +499,15 @@
             if (action === 'agregar') {
                 const nombre = btn.dataset.nombre;
                 const precio = parseFloat(btn.dataset.precio);
-                const fn = () => agregarAlCarrito(nombre, precio, 1);
-                blindTap(label, fn, e);
+                if (isBlindMode) {
+                    // Modo ciego: doble-tap directo, el bot ya maneja ingredientes por voz
+                    const fn = () => agregarAlCarrito(nombre, precio, 1);
+                    blindTap(label, fn, e);
+                } else {
+                    // Modo normal: abrir modal de ingredientes
+                    e.preventDefault();
+                    abrirModalIngredientes(nombre, precio);
+                }
             } else if (action === 'video') {
                 const nombre = btn.dataset.nombre;
                 const url    = btn.dataset.url;
