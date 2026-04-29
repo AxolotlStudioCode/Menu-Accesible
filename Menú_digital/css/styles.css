@@ -72,16 +72,110 @@ body.blind-voice-simplified .blind-bubble {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 1000;
+    gap: 0;
 }
 
 .bubble-circle {
     width: 200px;
     height: 200px;
     border-radius: 50%;
-    background: linear-gradient(145deg, var(--primary-light), var(--primary));
-    box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5);
+    background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+    box-shadow: 0 10px 40px rgba(37, 99, 235, 0.6), 0 0 0 0 rgba(37,99,235,0.4);
     transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.bubble-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 70px;
+    color: white;
+    font-size: 2.2rem;
+    transition: all 0.3s ease;
+    z-index: 3;
+}
+
+.bubble-waves {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: none;
+}
+.bubble-waves span {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    animation: waveExpand 1.8s ease-out infinite;
+}
+.bubble-waves span:nth-child(2) { animation-delay: 0.5s; }
+.bubble-waves span:nth-child(3) { animation-delay: 1s; }
+
+@keyframes waveExpand {
+    0%   { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.8); opacity: 0; }
+}
+
+.bubble-outer-ring {
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 2px solid rgba(59,130,246,0.3);
     animation: none;
+    z-index: 1;
+}
+
+.bubble-status {
+    margin-top: 24px;
+    color: rgba(255,255,255,0.85);
+    font-size: 1.1rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-align: center;
+    z-index: 2;
+}
+
+/* Botón transparente sobre la burbuja para capturar taps */
+.bubble-tap-btn {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.bubble-circle.speaking {
+    animation: speakPulse 0.8s infinite alternate;
+    box-shadow: 0 10px 50px rgba(37, 99, 235, 0.8), 0 0 0 8px rgba(37,99,235,0.15);
+    background: linear-gradient(145deg, #60a5fa, #2563eb);
+}
+.bubble-circle.speaking .bubble-waves { display: block; }
+.bubble-circle.speaking .bubble-icon { font-size: 2.6rem; }
+
+.bubble-circle.listening {
+    animation: listenPulse 0.6s infinite alternate;
+    box-shadow: 0 10px 50px rgba(16, 185, 129, 0.8), 0 0 0 8px rgba(16,185,129,0.15);
+    background: linear-gradient(145deg, #34d399, #059669);
+}
+.bubble-circle.listening .bubble-waves { display: block; }
+.bubble-circle.listening .bubble-icon { color: white; }
+
+.bubble-circle.idle {
+    box-shadow: 0 10px 40px rgba(37, 99, 235, 0.4);
 }
 
 .bubble-circle.speaking {
@@ -103,13 +197,14 @@ body.blind-voice-simplified .blind-bubble {
 }
 
 .bubble-text {
-    margin-top: 20px;
-    color: #ffffff;
-    font-size: 1.5rem;
-    font-weight: 600;
+    margin-top: 14px;
+    color: rgba(255,255,255,0.75);
+    font-size: 1rem;
+    font-weight: 400;
     text-align: center;
-    max-width: 300px;
-    display: none; /* se muestra solo cuando hay texto */
+    max-width: 320px;
+    line-height: 1.5;
+    min-height: 24px;
 }
 
 /* El chatbot permanece oculto visualmente pero funcional; 
@@ -648,28 +743,125 @@ header {
     display: block;
 }
 
-/* Botón para desactivar TTS en bienvenida */
-#btn-disable-tts {
-    background: var(--secondary);
-    color: white;
-    border: none;
-    padding: 10px 22px;
-    border-radius: var(--radius-xl);
-    font-weight: 600;
-    margin: 15px 0;
-    display: inline-flex;
+/* ==========================================
+   PANTALLA TTS PROMPT (nueva, primera pantalla)
+   ========================================== */
+.tts-prompt-modal {
+    max-width: 500px !important;
+    padding: 48px 40px !important;
+}
+
+.tts-prompt-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary-light), #bfdbfe);
+    color: var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 24px;
+    box-shadow: 0 8px 24px rgba(37,99,235,0.15);
+}
+
+.tts-prompt-buttons {
+    display: flex;
+    gap: 16px;
+    margin: 28px 0 20px;
+}
+
+.tts-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
+    padding: 24px 16px;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--border);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.25s ease;
+    background: var(--bg-app);
+}
+
+.tts-btn i { font-size: 1.8rem; }
+
+.tts-btn span {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-main);
+}
+
+.tts-btn small {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.tts-btn-yes {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+.tts-btn-yes i { color: var(--primary); }
+.tts-btn-yes:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+.tts-btn-yes:hover i,
+.tts-btn-yes:hover span,
+.tts-btn-yes:hover small { color: white; }
+
+.tts-btn-no:hover {
+    border-color: var(--text-main);
+    background: var(--text-main);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+.tts-btn-no:hover i,
+.tts-btn-no:hover span,
+.tts-btn-no:hover small { color: white; }
+
+.tts-prompt-hint {
+    font-size: 0.83rem;
+    color: var(--text-light);
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+}
+.tts-prompt-hint i { color: var(--primary); margin-right: 4px; }
+
+/* Botón silenciar — esquina superior derecha del modal de modos */
+.btn-mute-tts {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: #f1f5f9;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: var(--radius-xl);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     cursor: pointer;
     transition: all 0.2s;
     font-family: inherit;
-    font-size: 0.9rem;
-    text-decoration: none;
+    font-size: 0.85rem;
+}
+.btn-mute-tts:hover {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
 }
 
-#btn-disable-tts:hover {
-    background: var(--text-main);
-    transform: scale(1.05);
+/* El modal de modos necesita position relative para el botón absoluto */
+.welcome-modal {
+    position: relative;
 }
 
 .welcome-skip {
