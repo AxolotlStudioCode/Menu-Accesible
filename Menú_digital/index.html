@@ -473,7 +473,7 @@
         <div class="bubble-circle" id="bubble-circle">
             <div class="bubble-icon" id="bubble-icon">
                 <i class="fas fa-microphone" id="bubble-icon-glyph"></i>
-                <span class="bubble-tap-hint">Toque una vez para hablar</span>
+                <span class="bubble-tap-hint">Mantén presionado</span>
             </div>
             <div class="bubble-waves" id="bubble-waves">
                 <span></span><span></span><span></span>
@@ -481,8 +481,10 @@
         </div>
         <div class="bubble-status" id="bubble-status">Toca para hablar</div>
         <div class="bubble-text" id="bubble-text"></div>
-        <button class="bubble-tap-btn" id="bubble-tap-btn" onclick="activarVozCiego()" 
-                aria-label="Toca para hablar con el asistente">
+        <button class="bubble-tap-btn" id="bubble-tap-btn"
+                aria-label="Mantén presionado para hablar"
+                onmousedown="iniciarEscucha()" onmouseup="detenerEscucha()" onmouseleave="detenerEscucha()"
+                ontouchstart="iniciarEscucha(event)" ontouchend="detenerEscucha(event)" ontouchcancel="detenerEscucha(event)">
         </button>
     </div>
 
