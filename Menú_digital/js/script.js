@@ -7,8 +7,7 @@ let isReadAloud = false;
 let isHighContrast = false;
 let isBlindMode = false;
 let speechSynth = window.speechSynthesis;
-let voiceAssistantEnabled = true;
-let recognitionInstance = null;   // Movida aquí para evitar errores de inicialización
+let voiceAssistantEnabled = true; // controla si bot habla y mic está activo
 
 // Sistema de doble-tap para modo ciego
 let pendingAction = null;
@@ -61,6 +60,7 @@ const platillosData = {
 // ==========================================
 // UTILIDAD: FORMATEAR PRECIO PARA TTS
 // ==========================================
+// Convierte 12.99 → "12 pesos con 99 centavos" para evitar que el TTS lo lea como fecha
 function precioParaVoz(precio) {
     const n = parseFloat(precio);
     if (isNaN(n)) return precio;
@@ -189,6 +189,7 @@ function abrirModalIngredientes(nombre, precio) {
     const data = platillosData[nombre];
     if (!data) { agregarAlCarrito(nombre, precio, 1); return; }
 
+    // Crear modal
     let modal = document.getElementById('ingredientes-modal');
     if (!modal) {
         modal = document.createElement('div');
@@ -271,7 +272,10 @@ document.addEventListener('keydown', (e) => {
 // ==========================================
 // ACCESIBILIDAD — lector de pantalla con doble toque real
 // ==========================================
-let readerPendingKey = null;
+// El sistema usa un ID único por elemento para detectar "mismo elemento tocado dos veces"
+// independientemente de dónde exactamente toca el dedo dentro del elemento.
+
+let readerPendingKey = null;   // string identificador del elemento pendiente
 let readerPendingTimeout = null;
 let readerPendingAction = null;
 
@@ -281,28 +285,36 @@ function clearReaderPending() {
     readerPendingAction = null;
 }
 
+// Obtener una clave estable para identificar el elemento tocado
 function getElementKey(target) {
+    // Botón con data-action tiene nombre único
     const btnAction = target.closest('[data-action]');
     if (btnAction) {
         return (btnAction.dataset.action || '') + '::' + (btnAction.dataset.nombre || btnAction.dataset.action);
     }
+    // Tarjeta de platillo
     const card = target.closest('.card[data-name]');
     if (card) return 'card::' + card.dataset.name;
+    // Botón genérico: usar aria-label o texto
     const btn = target.closest('button');
     if (btn) return 'btn::' + (btn.getAttribute('aria-label') || btn.textContent.trim()).slice(0, 40);
     return null;
 }
 
+// Construir la info (texto a leer + acción a ejecutar en segundo toque) según el elemento
 function describir(target) {
+    // ── Botón AGREGAR ──────────────────────────────────────────────────────
     const btnAgregar = target.closest('[data-action="agregar"]');
     if (btnAgregar) {
         const nombre = btnAgregar.dataset.nombre;
         const precio = btnAgregar.dataset.precio;
         const platillo = platillosData[nombre];
+        // Ingredientes breves para que sepa qué va a pedir
         const ings = platillo ? platillo.ingredients.slice(0, 4).join(', ') : '';
         const textoIngs = ings ? ` Lleva: ${ings}.` : '';
         return {
             texto: `Agregar ${nombre}. ${precioParaVoz(precio)}.${textoIngs} Toque de nuevo para agregar a su orden.`,
+            // Agregar directo en modo reader, sin modal visual
             action: () => {
                 agregarAlCarrito(nombre, parseFloat(precio), 1, [], [], true);
                 hablar(`${nombre} agregado a su orden. Total: ${precioParaVoz(total)}.`);
@@ -310,11 +322,13 @@ function describir(target) {
         };
     }
 
+    // ── Botón VER VIDEO ────────────────────────────────────────────────────
     const btnVideo = target.closest('.btn-video-toggle, [data-action="video"]');
     if (btnVideo) {
         const nombre = btnVideo.dataset.nombre || '';
         const url = btnVideo.dataset.url || '';
         const platillo = platillosData[nombre];
+        // Descripción corta (la de la tarjeta, no el párrafo largo)
         const card = btnVideo.closest('.card');
         const descCorta = card ? (card.querySelector('.card-description')?.textContent?.trim() || '') : '';
         const ings = platillo ? 'Ingredientes: ' + platillo.ingredients.join(', ') + '.' : '';
@@ -324,6 +338,7 @@ function describir(target) {
         };
     }
 
+    // ── Botón DESCARGAR ORDEN ──────────────────────────────────────────────
     const btnDescargar = target.closest('[data-action="descargar"]');
     if (btnDescargar) {
         return {
@@ -332,30 +347,36 @@ function describir(target) {
         };
     }
 
+    // ── TARJETA (zona fuera de botones) ────────────────────────────────────
     const card = target.closest('.card');
     if (card && !target.closest('button')) {
         const nombre = card.dataset.name;
         const precio = card.dataset.price;
+        // Usar la descripción corta que ya existe en la tarjeta, NO el párrafo largo
         const descCorta = card.querySelector('.card-description')?.textContent?.trim() || '';
         const platillo = platillosData[nombre];
         const ings = platillo ? platillo.ingredients.slice(0, 5).join(', ') : '';
         const textoIngs = ings ? ` Ingredientes principales: ${ings}.` : '';
+        // Alérgenos
         const badges = Array.from(card.querySelectorAll('.badge')).map(b => b.textContent.trim()).join(', ');
         const textoAlerg = badges ? ` Contiene: ${badges}.` : '';
         return {
             texto: `${nombre}. ${precioParaVoz(precio)}. ${descCorta}${textoIngs}${textoAlerg} Toque de nuevo para explorar opciones.`,
-            action: null
+            action: null  // segundo toque en la tarjeta genérica no hace nada especial
         };
     }
 
+    // ── BOTÓN GENÉRICO ─────────────────────────────────────────────────────
     const btn = target.closest('button');
     if (btn) {
         const lbl = btn.getAttribute('aria-label') || btn.textContent.trim();
         if (!lbl) return null;
+        // Capturar referencia estable antes del setTimeout
         const btnRef = btn;
         return {
             texto: `${lbl}. Toque de nuevo para activar.`,
             action: () => {
+                // Disparar click nativo sin pasar por el listener del reader
                 isReadAloud = false;
                 btnRef.click();
                 isReadAloud = true;
@@ -367,9 +388,13 @@ function describir(target) {
 }
 
 function leerElemento(e) {
+    // Zonas donde el reader NO debe interceptar
     if (e.target.closest('.accessibility-panel') || e.target.closest('.panel-content')) return;
+    // Modal de video abierto: dejar pasar todos sus clicks (cerrar, iframe, etc.)
     if (document.getElementById('video-modal').classList.contains('active')) return;
+    // Boton X de eliminar item del carrito
     if (e.target.closest('.btn-remove')) return;
+    // Modal de ingredientes abierto
     const ingModal = document.getElementById('ingredientes-modal');
     if (ingModal && ingModal.classList.contains('active')) return;
 
@@ -380,6 +405,7 @@ function leerElemento(e) {
     e.stopPropagation();
 
     if (readerPendingKey && readerPendingKey === key) {
+        // SEGUNDO TOQUE: ejecutar accion
         const actionToRun = readerPendingAction;
         clearReaderPending();
         speechSynth.cancel();
@@ -388,6 +414,7 @@ function leerElemento(e) {
             setTimeout(() => actionToRun(), 400);
         }
     } else {
+        // PRIMER TOQUE: leer descripcion
         const info = describir(e.target);
         if (!info) return;
         clearReaderPending();
@@ -416,7 +443,7 @@ function toggleReadAloud() {
 // PANTALLA DE BIENVENIDA Y SELECCIÓN DE MODO
 // ==========================================
 let modoSeleccionRecognition = null;
-let micSeleccionActivo = true;
+let micSeleccionActivo = true; // controla si el mic de selección está activo
 
 function iniciarMicSeleccion() {
     if (!micSeleccionActivo) return;
@@ -444,6 +471,7 @@ function iniciarMicSeleccion() {
             micSeleccionActivo = false;
             detenerMicSeleccion();
         } else {
+            // No reconoció opción válida — reintentar
             setTimeout(() => iniciarMicSeleccion(), 500);
         }
     };
@@ -453,6 +481,7 @@ function iniciarMicSeleccion() {
     };
     rec.onend = () => {
         if (modoSeleccionRecognition === rec) modoSeleccionRecognition = null;
+        // Reiniciar automáticamente si sigue activo y no se eligió nada
         if (micSeleccionActivo && !modoSeleccionRecognition) {
             setTimeout(() => iniciarMicSeleccion(), 600);
         }
@@ -470,13 +499,10 @@ function detenerMicSeleccion() {
 
 function mostrarPantallaSeleccion() {
     micSeleccionActivo = true;
-
-    const blindOverlay = document.getElementById('blind-choice-overlay');
-    if (blindOverlay) blindOverlay.style.display = 'none';
-
     const welcomeEl = document.getElementById('welcome-overlay');
     if (welcomeEl) {
         welcomeEl.style.display = 'flex';
+        // Siempre hablar las opciones al mostrar pantalla de selección (persona puede ser ciega)
         setTimeout(() => {
             hablar(
                 "Bienvenido al menú digital accesible. " +
@@ -485,7 +511,11 @@ function mostrarPantallaSeleccion() {
                 "Opción tres: Baja visión o ceguera. " +
                 "Opción cuatro: Barrera para hablar. " +
                 "Puede decirlo por voz o tocar el botón. " +
-                "Diga silenciar para detener el audio."
+                "Diga silenciar para detener el audio.",
+                () => {
+                    // Iniciar mic después de que termina de hablar
+                    if (micSeleccionActivo) iniciarMicSeleccion();
+                }
             );
         }, 400);
     }
@@ -504,20 +534,15 @@ function speakWelcome() {
 
 function hideOverlay(id) {
     const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-}
-
-function closeWelcome() {
-    hideOverlay('welcome-overlay');
-    detenerMicSeleccion();
+    if (el) { el.classList.add('hidden'); setTimeout(() => el.remove(), 500); }
 }
 
 function selectMode(mode) {
     speechSynth.cancel();
     detenerMicSeleccion();
-    closeWelcome();
-
     if (mode === 'blind') {
+        closeWelcome();
+        // Mostrar overlay de elección ciego y hablar las opciones
         const overlay = document.getElementById('blind-choice-overlay');
         if (overlay) {
             overlay.style.display = 'flex';
@@ -527,16 +552,18 @@ function selectMode(mode) {
                     "Opción uno: Lector de pantalla del dispositivo. Usa el TTS de su teléfono. " +
                     "Opción dos: Chatbot IA por voz. El asistente de voz inteligente le atiende hablando. " +
                     "Opción tres: Lector de voz de la página. Alto contraste y lector integrado activado automáticamente. " +
-                    "Diga uno, dos o tres, o toque el botón."
+                    "Diga uno, dos o tres, o toque el botón.",
+                    () => iniciarMicElegirCiego()
                 );
             }, 200);
         }
         return;
     }
     aplicarModo(mode);
+    closeWelcome();
 }
 
-// Mic para elegir entre voice/reader en blind-choice-overlay (solo se activa manualmente)
+// Mic para elegir entre voice/reader en blind-choice-overlay
 let blindChoiceRec = null;
 function iniciarMicElegirCiego() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -572,19 +599,16 @@ function setBlindMode(choice) {
 }
 
 function aplicarModo(mode, blindChoice = null) {
-    if (mode === 'blind' && !blindChoice) {
-        selectMode('blind');
-        return;
-    }
-
     sessionStorage.setItem('accessMode', mode);
 
+    // Por defecto, ocultar el chatbot en todos los modos excepto donde se necesita
     const chatbotContainer = document.getElementById('chatbot-container');
     if (chatbotContainer) chatbotContainer.style.display = 'none';
 
     switch (mode) {
         case 'deaf':
             document.querySelectorAll('.btn-secondary').forEach(b => { b.style.borderColor = '#2563EB'; b.style.background = '#DBEAFE'; });
+            // Mostrar chatbot en modo sordo también (pueden escribir)
             if (chatbotContainer) chatbotContainer.style.display = '';
             break;
         case 'blind':
@@ -597,10 +621,12 @@ function aplicarModo(mode, blindChoice = null) {
                 document.addEventListener('click', leerElemento, true);
                 activarModoCiego();
                 document.body.classList.add('blind-voice-simplified');
+                // Solo en este modo aparece la burbuja de voz
                 document.getElementById('blind-bubble').classList.remove('hidden');
+                // Chatbot visible pero sin botón toggle (la burbuja lo controla)
                 if (chatbotContainer) chatbotContainer.style.display = '';
                 const mensajes = document.getElementById('chatbot-messages');
-                if (mensajes) mensajes.innerHTML = '';
+                mensajes.innerHTML = '';
                 addMessage("¡Hola! Soy su asistente de pedido. Diga el nombre de un platillo para pedirlo, pregunte ingredientes, o diga «ver mi orden» o «pagar». ¡Toque la burbuja cuando quiera hablar!", 'bot');
 
                 const savedOrden = sessionStorage.getItem('ordenGuardada');
@@ -634,21 +660,27 @@ function aplicarModo(mode, blindChoice = null) {
                     });
                 }, 500);
             } else if (blindChoice === 'tts') {
+                // Modo TTS del dispositivo: interfaz visual normal con ARIA enriquecido
+                // La burbuja de voz NO aparece - el TTS del teléfono (VoiceOver/TalkBack) lo hace
                 document.getElementById('blind-bubble').classList.add('hidden');
                 document.body.classList.add('blind-tts-mode');
-                isReadAloud = false;
+                isReadAloud = false; // No usamos el TTS interno de la página
                 voiceAssistantEnabled = false;
+                // Chatbot oculto en este modo
                 if (chatbotContainer) chatbotContainer.style.display = 'none';
+                // Aplicar ARIA live region y focus en el título del menú
                 setTimeout(() => {
                     const titulo = document.querySelector('.section-title');
                     if (titulo) titulo.focus();
                 }, 300);
             } else {
+                // reader: TTS de la página activado automáticamente (no chatbot, no burbuja)
                 isReadAloud = true;
                 voiceAssistantEnabled = true;
                 document.getElementById('btn-read').classList.add('active');
                 document.addEventListener('click', leerElemento, true);
                 document.getElementById('blind-bubble').classList.add('hidden');
+                // Anunciar activación
                 setTimeout(() => {
                     hablar(
                         "Lector de pantalla activado. Toque una vez cualquier elemento para escuchar su descripción. " +
@@ -659,11 +691,14 @@ function aplicarModo(mode, blindChoice = null) {
             }
             break;
         case 'quiet':
+            closeWelcome();
             document.getElementById('blind-bubble').classList.add('hidden');
+            // En modo silencio sí se muestra el chatbot
             if (chatbotContainer) chatbotContainer.style.display = '';
             setTimeout(() => { toggleChatbot(); setTimeout(() => document.getElementById('chatbot-input').focus(), 150); }, 300);
             break;
         default:
+            // Modo default: burbuja no aparece, chatbot disponible
             document.getElementById('blind-bubble').classList.add('hidden');
             if (chatbotContainer) chatbotContainer.style.display = '';
             break;
@@ -692,125 +727,102 @@ function actualizarBurbujaEstado(estado, textoStatus) {
 }
 
 // ==========================================
-// PUSH-TO-TALK — modo ciego voz (mantener burbuja presionada)
+// PUSH-TO-TALK — modo ciego voz
 // ==========================================
-let pttRecognition = null;
-let pttTranscript = '';
-let pttPresionado = false;
-let pttReinicioTimer = null;
-let pttTouchId = null;
+// El usuario mantiene presionado la burbuja para hablar y suelta para que el bot conteste.
+// No hay auto-reinicio ni colisiones de estado.
 
-function _crearRecPTT() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return null;
-    const rec = new SpeechRecognition();
-    rec.lang = 'es-MX';
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-
-    rec.onresult = (event) => {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-                pttTranscript += event.results[i][0].transcript + ' ';
-            }
-        }
-    };
-
-    rec.onerror = (event) => {
-        if (event.error === 'no-speech' || event.error === 'audio-capture') {
-            pttRecognition = null;
-            if (pttPresionado) _reiniciarRecPTT();
-            return;
-        }
-        pttRecognition = null;
-        if (pttPresionado) _reiniciarRecPTT();
-    };
-
-    rec.onend = () => {
-        if (pttRecognition === rec) pttRecognition = null;
-        if (pttPresionado) _reiniciarRecPTT();
-    };
-
-    return rec;
-}
-
-function _reiniciarRecPTT() {
-    if (pttReinicioTimer) return;
-    pttReinicioTimer = setTimeout(() => {
-        pttReinicioTimer = null;
-        if (!pttPresionado) return;
-        const rec = _crearRecPTT();
-        if (!rec) return;
-        pttRecognition = rec;
-        try { rec.start(); } catch(err) {
-            pttRecognition = null;
-            pttPresionado = false;
-            actualizarBurbujaEstado('idle', 'Mantén presionado');
-        }
-    }, 200);
-}
+let pttRecognition = null;   // instancia activa de SpeechRecognition
+let pttTranscript = '';      // lo que captó el micrófono
+let pttPresionado = false;   // ¿está el botón presionado ahora mismo?
 
 function iniciarEscucha(e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === 'touchstart') {
-            if (pttTouchId !== null) return;
-            pttTouchId = e.changedTouches[0].identifier;
-        }
-    }
+    if (e) e.preventDefault();   // evitar doble-fire en touch + mouse
     if (!voiceAssistantEnabled) return;
-    if (pttPresionado) return;
+    if (pttPresionado) return;    // ya está activo
     pttPresionado = true;
     pttTranscript = '';
 
+    // Feedback visual inmediato
+    const circle = document.getElementById('bubble-circle');
+    if (circle) { circle.classList.remove('idle', 'speaking'); circle.classList.add('pressing'); }
+
+    // Si el bot estaba hablando, silenciarlo para escuchar al usuario
     speechSynth.cancel();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         hablar('Su navegador no soporta reconocimiento de voz.');
         pttPresionado = false;
-        pttTouchId = null;
         return;
     }
 
     actualizarBurbujaEstado('listening', 'Habla ahora...');
 
-    const rec = _crearRecPTT();
-    if (!rec) {
-        pttPresionado = false;
-        pttTouchId = null;
-        return;
-    }
+    const rec = new SpeechRecognition();
     pttRecognition = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = true;        // captura mientras el botón está presionado
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (event) => {
+        // Acumular todos los resultados mientras el botón sigue presionado
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            pttTranscript += event.results[i][0].transcript + ' ';
+        }
+    };
+
+    rec.onerror = (event) => {
+        // 'no-speech' es normal si el usuario no habló — no hacer nada dramático
+        if (event.error !== 'no-speech') {
+            console.error('PTT error:', event.error);
+        }
+        pttPresionado = false;
+        pttRecognition = null;
+        actualizarBurbujaEstado('idle', 'Manten presionado');
+    };
+
+    rec.onend = () => {
+        pttRecognition = null;
+        // Si aún está presionado y terminó solo (timeout del navegador), reiniciar
+        if (pttPresionado) {
+            try {
+                const rec2 = new SpeechRecognition();
+                pttRecognition = rec2;
+                rec2.lang = 'es-MX';
+                rec2.continuous = true;
+                rec2.interimResults = false;
+                rec2.onresult = rec.onresult;
+                rec2.onerror = rec.onerror;
+                rec2.onend = rec.onend;
+                rec2.start();
+            } catch(err) {
+                pttPresionado = false;
+                actualizarBurbujaEstado('idle', 'Manten presionado');
+            }
+        }
+    };
+
     try {
         rec.start();
     } catch(err) {
         pttPresionado = false;
         pttRecognition = null;
-        pttTouchId = null;
-        actualizarBurbujaEstado('idle', 'Mantén presionado');
+        actualizarBurbujaEstado('idle', 'Manten presionado');
     }
 }
 
 function detenerEscucha(e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === 'touchend' || e.type === 'touchcancel') {
-            const touchId = e.changedTouches[0].identifier;
-            if (touchId !== pttTouchId) return;
-            pttTouchId = null;
-        } else if (e.type === 'mouseleave' && !pttPresionado) {
-            return;
-        }
-    }
+    if (e) e.preventDefault();
     if (!pttPresionado) return;
     pttPresionado = false;
 
-    if (pttReinicioTimer) { clearTimeout(pttReinicioTimer); pttReinicioTimer = null; }
+    // Quitar feedback visual de presionado
+    const circle = document.getElementById('bubble-circle');
+    if (circle) circle.classList.remove('pressing');
 
+    // Detener reconocimiento
     if (pttRecognition) {
         try { pttRecognition.stop(); } catch(err) {}
         pttRecognition = null;
@@ -820,11 +832,12 @@ function detenerEscucha(e) {
     pttTranscript = '';
 
     if (!texto) {
+        // Nada captado — volver a idle
         actualizarBurbujaEstado('idle', 'Mantén presionado');
-        hablar('No escuché nada. Mantén presionado y habla cerca del micrófono.');
         return;
     }
 
+    // Mostrar lo que dijo el usuario y procesar
     actualizarBurbujaEstado('speaking', 'Procesando...');
     document.getElementById('chatbot-input').value = texto;
     addMessage(texto, 'user');
@@ -838,12 +851,15 @@ function detenerEscucha(e) {
                 actualizarBurbujaEstado('idle', 'Mantén presionado');
             }
         });
-    }, 200);
+    }, 300);
 }
 
+// Mantener activarVozCiego como alias por si algún otro código lo llama
 function activarVozCiego() {
-    // No se usa en push-to-talk
+    // No se usa en push-to-talk — no-op para evitar errores
 }
+
+function closeWelcome() { hideOverlay('welcome-overlay'); }
 
 // ==========================================
 // DESACTIVAR / REACTIVAR ASISTENTE DE VOZ
@@ -853,6 +869,7 @@ function desactivarTTS() {
     voiceAssistantEnabled = false;
     isReadAloud = false;
     clearReaderPending();
+    // Limpiar push-to-talk si estaba activo
     pttPresionado = false;
     if (pttRecognition) { try { pttRecognition.stop(); } catch(e) {} pttRecognition = null; }
     document.getElementById('btn-read').classList.remove('active');
@@ -896,6 +913,7 @@ function extraerCantidad(texto) {
     return 1;
 }
 
+// Aliases y palabras clave alternativas para detectar platillos por nombre parcial o coloquial
 const platilloAliases = {
     'Tacos al Pastor': ['taco', 'tacos', 'pastor', 'taquito', 'taquitos', 'taco pastor', 'tacos pastor', 'al pastor'],
     'Hamburguesa Clásica': ['hamburguesa', 'hamburguesas', 'burger', 'burguesa', 'hamburgesa', 'hamburger', 'clasica', 'clásica'],
@@ -907,10 +925,13 @@ const platilloAliases = {
     'Filete de Salmón': ['salmon', 'salmón', 'filete', 'filete salmon', 'filete de salmon', 'pescado']
 };
 
+// Encontrar platillo por nombre exacto o alias en el texto
 function encontrarPlatillo(msg) {
+    // Primero búsqueda exacta por nombre completo
     for (let nombre in platillosData) {
         if (msg.includes(nombre.toLowerCase())) return nombre;
     }
+    // Luego búsqueda por aliases
     for (let nombre in platilloAliases) {
         const aliases = platilloAliases[nombre];
         for (let alias of aliases) {
@@ -920,87 +941,74 @@ function encontrarPlatillo(msg) {
     return null;
 }
 
-function detectarModIngrediente(msg) {
-    const regexQuitar = /\b(sin|quitar|quita|quítame|quitame|sin el|sin la|sin los|sin las|elimina|eliminar|omite|omitir|no quiero|no le pongas|no pongas|retirar|retira|remueve|remover|sin poner)\b\s+(?:el\s+|la\s+|los\s+|las\s+)?([a-záéíóúñ][a-záéíóúñ\s]{1,30}?)(?:\s+(?:de\s+(?:la\s+|el\s+|los\s+|las\s+)?|del\s+|en\s+(?:la\s+|el\s+)?|al\s+)(.+))?$/i;
-    const regexAgregar = /\b(con extra|extra|adicional|agrega|agregar|añade|añadir|ponle|ponme|más|mas)\s+(?:de\s+)?(?:el\s+|la\s+|los\s+|las\s+)?([a-záéíóúñ][a-záéíóúñ\s]{1,30}?)(?:\s+(?:a\s+(?:la\s+|el\s+)?|en\s+(?:la\s+|el\s+)?|al\s+)(.+))?$/i;
-
-    let m = msg.match(regexQuitar);
-    if (m) {
-        const ing = (m[2] || '').trim().replace(/\s+/g, ' ');
-        const ref = (m[3] || '').trim();
-        if (ing && !encontrarPlatillo(ing)) return { accion: 'quitar', ingrediente: ing, platilloRef: ref || null };
-    }
-    m = msg.match(regexAgregar);
-    if (m) {
-        const ing = (m[2] || '').trim().replace(/\s+/g, ' ');
-        const ref = (m[3] || '').trim();
-        if (ing && !encontrarPlatillo(ing)) return { accion: 'agregar', ingrediente: ing, platilloRef: ref || null };
-    }
-    return null;
-}
-
-function detectarEliminarPlatillo(msg) {
-    const regexElim = /\b(eliminar|elimina|quitar|quita|borrar|borra|remover|remueve|cancel|cancelar|cancela|ya no quiero|no quiero|saca|sacar)\b/;
-    const regexRef  = /\b(de mi orden|de la orden|del pedido|del carrito|de mi pedido)\b/;
-    if (!regexElim.test(msg)) return null;
-    const platillo = encontrarPlatillo(msg);
-    if (!platillo) return null;
-    return platillo;
-}
-
 function processBotMessageLocal(message) {
     const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    if (msg.match(/\b(silenciar|desactivar asistente|silencio|detente|stop)\b/)) {
+    // Silenciar / activar asistente
+    if (msg.match(/silenciar|desactivar asistente|silencio|para|detente|stop/)) {
         desactivarTTS();
         if (recognitionInstance) { try { recognitionInstance.stop(); } catch(e) {} recognitionInstance = null; }
-        return "Asistente de voz silenciado. Puedes seguir escribiendo si lo necesitas.";
+        return "Asistente de voz silenciado.";
     }
 
-    if (msg.match(/\b(hola|buenas|hey|que tal|buenos dias|tardes|noches|hi|hello)\b/)) {
-        return "¡Hola! Puedes pedir diciendo por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes, o di 'menú' para escuchar las opciones.";
+    // Saludos
+    if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches|hi|hello/)) {
+        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes o decirte el menú completo.";
     }
-
-    if (msg.match(/\b(menu|platillos|opciones|que hay|que sirven|que ofrecen|carta|que tienen)\b/)) {
+    // Menú completo
+    if (msg.match(/menu|platillos|comida|que tiene|opciones|que hay|que sirven|que ofrecen|carta/)) {
         let menuTxt = "Platillos disponibles: ";
         for (let nombre in platillosData) menuTxt += `${nombre} a ${precioParaVoz(platillosData[nombre].price)}, `;
-        return menuTxt.replace(/, $/, '') + ". Puedes pedir con cantidad, ej. 'dos tacos' o 'tres pizzas'.";
+        return menuTxt.replace(/, $/, '') + ". Puedes pedir uno o varios con cantidad, ej. 'dos tacos' o 'tres pizzas'.";
     }
-
-    if (msg.match(/\b(cuanto cuesta|precio|cuanto vale|cuanto es el|cuanto son)\b/)) {
-        const platilloPrecio = encontrarPlatillo(msg);
-        if (platilloPrecio) return `${platilloPrecio} cuesta ${precioParaVoz(platillosData[platilloPrecio].price)}.`;
-        return "Dime de qué platillo quieres saber el precio. Por ejemplo: '¿cuánto cuesta el salmón?'";
-    }
-
-    if (msg.match(/\b(describe|descripcion|como es|que es|cuentame|informacion)\b/)) {
-        const platilloDesc = encontrarPlatillo(msg);
-        if (platilloDesc) return `${platilloDesc}: ${platillosData[platilloDesc].desc.slice(0, 200)}...`;
-        return "Dime de qué platillo quieres la descripción.";
-    }
-
-    if (msg.match(/\b(ingredientes|que contiene|que lleva|que tiene|componentes|alergen)\b/)) {
+    // Ingredientes de un platillo específico
+    if (msg.match(/ingredientes|que contiene|que lleva|tiene|componentes|alergen/)) {
         const platillo = encontrarPlatillo(msg);
         if (platillo) {
-            return `${platillo} lleva: ${platillosData[platillo].ingredients.join(', ')}. ¿Deseas quitar o agregar algún ingrediente? Por ejemplo: 'sin cebolla' o 'extra queso'.`;
+            return `${platillo} lleva: ${platillosData[platillo].ingredients.join(', ')}. ¿Deseas quitar o agregar algún ingrediente?`;
         }
         return "Dime de qué platillo quieres saber los ingredientes. Por ejemplo: '¿qué ingredientes tiene el sushi?'";
     }
+    // Modificar ingrediente — quitar
+    const modQuitar = msg.match(/(quitar|sin|eliminar|no quiero|no le pongas|omitir|remove)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(de|del|en|al)\s+(.+))?$/);
+    if (modQuitar) return modificarIngrediente((modQuitar[3] || '').trim(), 'quitar', modQuitar[5]?.trim());
+    // Modificar ingrediente — agregar
+    const modAgregar = msg.match(/(agregar|añadir|poner|con extra|extra|adicional|add)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(a|en|al|sobre)\s+(.+))?$/);
+    if (modAgregar) return modificarIngrediente((modAgregar[3] || '').trim(), 'agregar', modAgregar[5]?.trim());
 
-    if (msg.match(/\b(total|cuenta|resumen|que llevo|cuanto es|cuanto debo|cuanto seria|mi orden|ver orden|ver mi orden|que pedí|que pedi|mi pedido)\b/)) {
+    // Pedido con cantidad — detectar intención de ordenar + platillo
+    // Patrones: "quiero X tacos", "dame X sushi", "ponme X pizza", "pide X hamburguesa", "agrega X pollo", etc.
+    const intencionPedir = msg.match(/(quiero|quisiera|dame|ponme|pedir|pide|agrega|agregar|añade|ordenar|orden|trae|traeme|deseo|necesito|deme|ponle|va|van)/);
+    const platilloDetectado = encontrarPlatillo(msg);
+    if (platilloDetectado) {
+        const cantidad = extraerCantidad(msg);
+        agregarAlCarrito(platilloDetectado, platillosData[platilloDetectado].price, cantidad);
+        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
+        const precioVoz = precioParaVoz(platillosData[platilloDetectado].price * cantidad);
+        return `He añadido ${cantidad} ${platilloDetectado} a tu orden. Total de ese artículo: ${precioVoz}. ¿Algo más?`;
+    }
+    // Resumen / cuenta / total
+    if (msg.match(/total|cuenta|resumen|orden|que llevo|cuanto es|cuanto debo|cuanto seria|pedido|mi orden/)) {
         if (orden.length === 0) return "Tu orden está vacía. Puedes pedir algo diciendo el nombre del platillo.";
         let resumen = "Tu orden tiene: ";
-        orden.forEach(i => {
-            resumen += `${i.cantidad} ${i.nombre}`;
-            if (i.custom.removed.length) resumen += ` sin ${i.custom.removed.join(' ni ')}`;
-            if (i.custom.added.length) resumen += ` con extra ${i.custom.added.join(' y ')}`;
-            resumen += `, a ${precioParaVoz(i.precio * i.cantidad)}. `;
-        });
+        orden.forEach(i => resumen += `${i.cantidad} ${i.nombre} a ${precioParaVoz(i.precio * i.cantidad)}. `);
         resumen += `El total es ${precioParaVoz(total)}.`;
         return resumen;
     }
-
-    if (msg.match(/\b(enviar|descargar|pagar|finalizar|listo|cobrar|terminar|ya es todo|eso es todo|confirmar|confirma)\b/)) {
+    // Eliminar un platillo de la orden
+    if (msg.match(/eliminar|quitar de la orden|borrar|remover|cancel/)) {
+        const platilloEliminar = encontrarPlatillo(msg);
+        if (platilloEliminar) {
+            const idx = orden.findIndex(i => i.nombre === platilloEliminar);
+            if (idx !== -1) {
+                eliminarDelCarrito(orden[idx].id);
+                return `He eliminado ${platilloEliminar} de tu orden.`;
+            }
+            return `No tienes ${platilloEliminar} en tu orden.`;
+        }
+    }
+    // Pagar / enviar / finalizar
+    if (msg.match(/enviar|descargar|pagar|finalizar|listo|cobrar|terminar|ya es todo|eso es todo|confirmar|confirma/)) {
         if (orden.length === 0) return "No hay nada que enviar. ¿Qué deseas ordenar?";
         let resumen = "Finalizando su orden. Tiene: ";
         orden.forEach(i => resumen += `${i.cantidad} ${i.nombre}. `);
@@ -1008,88 +1016,42 @@ function processBotMessageLocal(message) {
         setTimeout(() => descargarOrden(), 1200);
         return resumen;
     }
-
-    if (msg.match(/\b(ayuda|como funciona|ayudame|comandos)\b/)) {
-        return "Puedes decir: 'quiero 2 tacos', 'dame una pizza', 'ingredientes del sushi', 'sin queso a la hamburguesa', 'extra cebolla', 'quita la pizza de mi orden', 'cuánto es el total', o 'ya es todo' para finalizar.";
+    // Precio de un platillo
+    if (msg.match(/cuanto cuesta|precio|cuanto vale|cuanto es el|cuanto son/)) {
+        const platilloPrecio = encontrarPlatillo(msg);
+        if (platilloPrecio) return `${platilloPrecio} cuesta ${precioParaVoz(platillosData[platilloPrecio].price)}.`;
+        return "Dime de qué platillo quieres saber el precio. Por ejemplo: '¿cuánto cuesta el salmón?'";
     }
-
-    const platilloParaEliminar = detectarEliminarPlatillo(msg);
-    if (platilloParaEliminar) {
-        const modCheck = detectarModIngrediente(msg);
-        if (!modCheck) {
-            const idx = orden.findIndex(i => i.nombre === platilloParaEliminar);
-            if (idx !== -1) {
-                const nombreEl = orden[idx].nombre;
-                eliminarDelCarrito(orden[idx].id);
-                sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
-                return `He eliminado ${nombreEl} de tu orden. ¿Algo más?`;
-            }
-            return `No tienes ${platilloParaEliminar} en tu orden actualmente. ¿Algo más en que pueda ayudarte?`;
-        }
+    // Descripción de un platillo
+    if (msg.match(/describe|descripcion|como es|que es|cuéntame|cuentame|informacion/)) {
+        const platilloDesc = encontrarPlatillo(msg);
+        if (platilloDesc) return `${platilloDesc}: ${platillosData[platilloDesc].desc}`;
+        return "Dime de qué platillo quieres la descripción.";
     }
-
-    const modIng = detectarModIngrediente(msg);
-    if (modIng) {
-        return modificarIngrediente(modIng.ingrediente, modIng.accion, modIng.platilloRef);
+    // Ayuda
+    if (msg.match(/ayuda|que puedo hacer|como funciona|ayudame|commands|comandos/)) {
+        return "Puedes decir: 'quiero 2 tacos', 'dame una pizza', 'ingredientes del sushi', 'sin queso la hamburguesa', 'cuánto es el total', o 'ya es todo' para finalizar tu orden.";
     }
-
-    const platilloDetectado = encontrarPlatillo(msg);
-    if (platilloDetectado) {
-        const cantidad = extraerCantidad(msg);
-        agregarAlCarrito(platilloDetectado, platillosData[platilloDetectado].price, cantidad);
-        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
-        const precioVoz = precioParaVoz(platillosData[platilloDetectado].price * cantidad);
-        return `He añadido ${cantidad} ${platilloDetectado} a tu orden por ${precioVoz}. ¿Deseas algo más, o quieres quitar algún ingrediente?`;
-    }
-
-    return "No entendí bien. Puedes pedir algo como '2 tacos al pastor', 'una pizza', 'sin cebolla', 'quita los tacos de mi orden', o di 'menú' para escuchar todas las opciones.";
+    // Respuesta por defecto
+    return "No entendí bien. Puedes pedir algo como '2 tacos al pastor', 'una pizza', 'qué ingredientes tiene el sushi', o di 'menú' para escuchar todas las opciones.";
 }
-function modificarIngrediente(ingredienteRaw, accion, platilloRef) {
+function modificarIngrediente(ingrediente, accion, platilloRef) {
     let item = null;
-
-    if (platilloRef && platilloRef.trim()) {
-        const ref = platilloRef.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        for (let p in platillosData) {
-            const pNorm = p.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            if (pNorm.includes(ref) || ref.includes(pNorm.split(' ')[0])) {
-                item = orden.find(i => i.nombre === p);
-                if (item) break;
-            }
-        }
-    }
-    if (!item) item = orden[orden.length - 1];
-
-    if (!item) return "No tienes ningún platillo en la orden. ¿Qué deseas pedir?";
+    if (platilloRef) {
+        for (let p in platillosData) if (p.toLowerCase().includes(platilloRef)) { item = orden.find(i => i.nombre === p); break; }
+    } else item = orden[orden.length-1];
+    if (!item) return "No encuentro ese platillo en tu orden.";
     if (!item.custom) item.custom = { removed: [], added: [] };
-
-    const ing = ingredienteRaw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
-    const platData = platillosData[item.nombre];
-    let ingReal = ingredienteRaw;
-    if (platData) {
-        const match = platData.ingredients.find(i => {
-            const iNorm = i.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            return iNorm.includes(ing) || ing.includes(iNorm.split(' ')[0]);
-        });
-        if (match) ingReal = match;
-    }
-
     if (accion === 'quitar') {
-        if (!item.custom.removed.find(i => i.toLowerCase() === ingReal.toLowerCase())) {
-            item.custom.removed.push(ingReal);
-        }
-        item.custom.added = item.custom.added.filter(i => i.toLowerCase() !== ingReal.toLowerCase());
+        if (!item.custom.removed.includes(ingrediente)) item.custom.removed.push(ingrediente);
+        item.custom.added = item.custom.added.filter(i => i !== ingrediente);
         renderizarOrden();
-        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
-        return `Listo, he quitado "${ingReal}" de ${item.nombre}. ¿Algo más que desees cambiar?`;
+        return `He quitado "${ingrediente}" de ${item.nombre}.`;
     } else {
-        if (!item.custom.added.find(i => i.toLowerCase() === ingReal.toLowerCase())) {
-            item.custom.added.push(ingReal);
-        }
-        item.custom.removed = item.custom.removed.filter(i => i.toLowerCase() !== ingReal.toLowerCase());
+        if (!item.custom.added.includes(ingrediente)) item.custom.added.push(ingrediente);
+        item.custom.removed = item.custom.removed.filter(i => i !== ingrediente);
         renderizarOrden();
-        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
-        return `Listo, he añadido extra "${ingReal}" a ${item.nombre}. ¿Algo más?`;
+        return `He añadido "${ingrediente}" a ${item.nombre}.`;
     }
 }
 function addMessage(text, sender) {
@@ -1109,7 +1071,7 @@ function handleChatKeypress(event) { if (event.key === 'Enter') sendMessage(); }
 // ==========================================
 // RECONOCIMIENTO DE VOZ (chatbot normal)
 // ==========================================
-// La variable recognitionInstance ya fue declarada al principio (let recognitionInstance = null;)
+let recognitionInstance = null;
 function activarVoz() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const micBtn = document.getElementById('mic-btn');
@@ -1203,18 +1165,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }, i * 80);
     });
 
+    // Asegurar que la burbuja siempre esté oculta al inicio
     const bubble = document.getElementById('blind-bubble');
     if (bubble) bubble.classList.add('hidden');
 
+    // Ocultar chatbot por defecto hasta que se elija el modo adecuado
     const chatbotContainer = document.getElementById('chatbot-container');
     if (chatbotContainer) chatbotContainer.style.display = 'none';
 
-    // Manejo del botón "Ver Video" inline
+    // ── MANEJO INLINE DEL BOTÓN "VER VIDEO" ──────────────────────────────
+    // Interceptar clicks en .btn-video-toggle para mostrar descripción debajo de la tarjeta
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.btn-video-toggle');
         if (!btn) return;
 
+        // En modo reader, leerElemento lo maneja (abre modal directo en 2do toque)
         if (isReadAloud && !isBlindMode) return;
+
+        // Si es modo ciego-voz, dejar que el sistema de blindTap lo maneje
         if (isBlindMode && document.body.classList.contains('blind-voice-simplified')) return;
 
         e.stopPropagation();
@@ -1226,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isOpen = btn.getAttribute('aria-expanded') === 'true';
 
         if (isOpen) {
+            // Cerrar descripción inline
             btn.setAttribute('aria-expanded', 'false');
             btn.innerHTML = '<i class="fas fa-play-circle"></i> Ver Video';
             if (descPanel) {
@@ -1233,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 descPanel.innerHTML = '';
             }
         } else {
+            // Abrir descripción inline
             btn.setAttribute('aria-expanded', 'true');
             btn.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
             const data = platillosData[nombre];
@@ -1250,28 +1220,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </div>`;
                 descPanel.hidden = false;
+                // Si es modo TTS, leer descripción para el lector de pantalla del dispositivo
                 if (document.body.classList.contains('blind-tts-mode')) {
                     descPanel.setAttribute('tabindex', '-1');
                     setTimeout(() => descPanel.focus(), 100);
                 }
             }
         }
-    }, true);
+    }, true); // capture para que corra antes del delegado global
 
-    // Burbuja PTT
-    const bubbleBtn = document.getElementById('bubble-tap-btn');
-    if (bubbleBtn) {
-        bubbleBtn.addEventListener('mousedown', (e) => { e.preventDefault(); iniciarEscucha(e); });
-        bubbleBtn.addEventListener('mouseup',   (e) => { e.preventDefault(); detenerEscucha(e); });
-        bubbleBtn.addEventListener('mouseleave',(e) => { if (pttPresionado) detenerEscucha(e); });
+    // sessionStorage: persiste en recarga, no en cierre de pestaña
+    const savedMode = sessionStorage.getItem('accessMode');
+    const savedBlindChoice = sessionStorage.getItem('blindChoice');
 
-        bubbleBtn.addEventListener('touchstart',  (e) => iniciarEscucha(e), { passive: false });
-        bubbleBtn.addEventListener('touchend',    (e) => detenerEscucha(e), { passive: false });
-        bubbleBtn.addEventListener('touchcancel', (e) => detenerEscucha(e), { passive: false });
+    if (savedMode) {
+        if (savedMode === 'blind' && savedBlindChoice) {
+            aplicarModo('blind', savedBlindChoice);
+        } else {
+            aplicarModo(savedMode);
+        }
+    } else {
+        setTimeout(() => mostrarPantallaSeleccion(), 400);
     }
-
-    // Mostrar pantalla de selección (sin iniciar micrófono)
-    sessionStorage.removeItem('accessMode');
-    sessionStorage.removeItem('blindChoice');
-    setTimeout(() => mostrarPantallaSeleccion(), 400);
 });
