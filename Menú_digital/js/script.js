@@ -16,42 +16,42 @@ let pendingTimeout = null;
 // Datos de platillos
 const platillosData = {
     'Tacos al Pastor': { 
-        desc: 'Nuestros tacos al pastor...',
+        desc: 'Tres auténticos tacos de cerdo marinado al estilo pastor, preparados con una mezcla artesanal de chiles guajillo y ancho, achiote, especias y zumo de piña natural. La carne se asa lentamente en trompo vertical hasta dorar por fuera y jugosa por dentro. Se sirven sobre tortillas de maíz recién hechas, coronados con trozos de piña fresca caramelizada, cilantro picado y cebolla blanca. Acompañados de salsa roja de chile de árbol, salsa verde tomatillo y rodajas de limón. Una explosión de sabores tradicionales mexicanos que combinan lo ahumado, lo dulce de la piña y el picante de las salsas.',
         ingredients: ['Carne de cerdo', 'Chile guajillo', 'Chile ancho', 'Piña natural', 'Achiote', 'Cilantro', 'Cebolla', 'Tortillas de maíz'],
         price: 12.99
     },
     'Hamburguesa Clásica': {
-        desc: 'Hamburguesa artesanal de 200g...',
+        desc: 'Hamburguesa artesanal con medallón de carne de res molida premium de 200 gramos, formada a mano y cocinada al término medio para conservar todos sus jugos. Se sirve en un suave pan brioche tostado con mantequilla, untado con mayonesa casera y mostaza Dijon. Lleva lechuga romana crujiente, rodajas de tomate maduro, aros de cebolla morada encurtida, pepinillos artesanales y una generosa capa de queso cheddar fundido. Acompañada de papas fritas crujientes y aderezo especial de la casa. El equilibrio perfecto entre lo clásico y lo gourmet.',
         ingredients: ['Carne de res molida premium', 'Queso cheddar', 'Lechuga romana', 'Tomate', 'Cebolla', 'Pepinillos', 'Pan brioche', 'Salsas especiales'],
         price: 14.99
     },
     'Pizza Margarita': {
-        desc: 'Pizza tradicional italiana...',
+        desc: 'Pizza napolitana clásica horneada en horno de piedra a alta temperatura para lograr una base crujiente por fuera y ligeramente esponjosa por dentro. La masa se elabora artesanalmente con 48 horas de fermentación lenta para desarrollar todo su sabor. Se cubre con salsa de tomates San Marzano importados, aplastados a mano con ajo y albahaca. Encima, generosas porciones de mozzarella di bufala fresca y campana que se funde perfectamente. Al salir del horno se añaden hojas de albahaca fresca, un hilo de aceite de oliva extra virgen y una pizca de sal marina en escamas. Sencilla, honesta y perfecta.',
         ingredients: ['Masa de pizza artesanal', 'Tomates San Marzano', 'Mozzarella di bufala', 'Albahaca fresca', 'Aceite de oliva extra virgen', 'Sal marina', 'Orégano'],
         price: 16.99
     },
     'Sushi Roll California': {
-        desc: 'Rollo de sushi estilo California...',
+        desc: 'Roll de sushi estilo California preparado por nuestro chef con técnica tradicional japonesa. Arroz de sushi sazonado con vinagre de arroz, azúcar y sal, extendido sobre lámina de nori tostada. Se rellena con palitos de imitación de cangrejo, aguacate Hass cremoso maduro en su punto y bastones de pepino fresco. Se enrolla con esterilla de bambú, se reboza en semillas de ajonjolí tostadas y se corta en 8 piezas uniformes. Se sirve con salsa de soya, jengibre en escabeche para limpiar el paladar entre piezas y wasabi al gusto. Una combinación suave, fresca y equilibrada, ideal para quienes se inician en el sushi.',
         ingredients: ['Arroz para sushi', 'Nori (alga marina)', 'Imitación de cangrejo', 'Aguacate', 'Pepino', 'Mayonesa japonesa', 'Semillas de ajonjolí', 'Salsa de soya'],
         price: 18.99
     },
     'Ensalada César': {
-        desc: 'Ensalada clásica César...',
+        desc: 'La icónica ensalada César preparada con la receta original, sin compromisos. Hojas de lechuga romana seleccionadas, lavadas y secadas, troceadas en piezas generosas para mantener su textura crujiente. El aderezo se prepara al momento emulsionando yema de huevo, filete de anchoa, ajo asado, jugo de limón, mostaza Dijon y aceite de oliva hasta lograr una crema sedosa. Se añade queso parmesano reggiano recién rallado en abundancia. Los crutones de pan de campo se hornean con ajo, romero y aceite hasta dorarlos perfectamente. Se termina con pimienta negra recién molida y más parmesano en lascas. Fresca, cremosa y llena de carácter.',
         ingredients: ['Lechuga romana', 'Queso parmesano', 'Huevo', 'Pan para crutones', 'Aceite de oliva', 'Mostaza Dijon', 'Limón', 'Ajo'],
         price: 11.99
     },
     'Pasta Carbonara': {
-        desc: 'Auténtica pasta carbonara romana...',
+        desc: 'Auténtica pasta carbonara romana elaborada con la receta tradicional, sin crema de leche — como manda la tradición. Espagueti de sémola de trigo duro cocido al dente en agua con sal abundante. La salsa se prepara fuera del fuego mezclando yemas de huevo frescas con queso pecorino romano rallado fino y pimienta negra recién molida en cantidad generosa, creando una emulsión untuosa y sedosa. La panceta curada se dora en sartén hasta quedar crujiente y aromática. Se mezcla todo rápidamente con el calor residual de la pasta para que el huevo no cuaje. El resultado es un plato cremoso, intenso y profundamente sabroso, fiel a la Roma de siempre.',
         ingredients: ['Espagueti', 'Panceta', 'Queso pecorino romano', 'Huevo', 'Pimienta negra', 'Sal'],
         price: 15.99
     },
     'Pollo Teriyaki': {
-        desc: 'Pechuga de pollo jugosa...',
+        desc: 'Pechuga de pollo de libre pastoreo marinada durante 12 horas en salsa teriyaki casera elaborada con salsa de soya japonesa, sake, mirin, azúcar morena, jengibre fresco rallado y ajo. Se sella a fuego alto en plancha de hierro para lograr esa costra caramelizada exterior característica, y se termina al horno para conservar toda su jugosidad interior. Se glasea al final con más salsa reducida hasta obtener un acabado brillante y lacado. Se sirve sobre arroz jazmín al vapor, acompañado de verduras salteadas con aceite de sésamo: brócoli, zanahoria, pimientos y ejotes. Un platillo equilibrado, aromático y lleno de umami.',
         ingredients: ['Pechuga de pollo', 'Salsa de soya', 'Sake', 'Azúcar', 'Jengibre', 'Ajo', 'Vegetales variados'],
         price: 17.99
     },
     'Filete de Salmón': {
-        desc: 'Filete de salmón noruego fresco...',
+        desc: 'Filete de salmón noruego fresco de 220 gramos, de carne firme, color rosado intenso y sabor suave. Se sella primero en sartén con mantequilla clarificada para lograr una piel crujiente y dorada, luego se termina al horno con hierbas frescas: eneldo, perejil y tomillo. Se baña con beurre blanc de limón amarillo, alcaparras y cebollín para realzar su sabor natural sin opacarlo. Se acompaña de papas cambray asadas con romero y aceite de oliva, más un bouquet de espárragos verdes salteados con mantequilla y flor de sal. Un plato elegante, ligero y nutritivo que celebra la calidad del producto.',
         ingredients: ['Filete de salmón noruego', 'Limón', 'Mantequilla', 'Perejil', 'Eneldo', 'Papas', 'Espárragos', 'Sal y pimienta'],
         price: 24.99
     }
@@ -275,9 +275,16 @@ function leerElemento(e) {
     const target = e.target;
     if (target.closest('.card')) {
         const card = target.closest('.card');
-        texto = `Platillo: ${card.dataset.name}. Precio: ${card.dataset.price} dólares.`;
-    } else if (target.closest('.btn-primary')) texto = 'Botón Agregar al carrito';
-    else if (target.closest('.btn-secondary')) texto = 'Botón Ver Video informativo';
+        const nombre = card.dataset.name;
+        const precio = card.dataset.price;
+        const desc = card.dataset.desc || '';
+        texto = `Platillo: ${nombre}. Precio: ${precio} pesos. ${desc}`;
+    } else if (target.closest('.btn-primary[data-action="agregar"]')) {
+        const btn = target.closest('[data-action="agregar"]');
+        texto = `Agregar ${btn.dataset.nombre} a la orden por ${btn.dataset.precio} pesos.`;
+    } else if (target.closest('.btn-secondary')) {
+        texto = 'Botón: Ver descripción y video del platillo.';
+    }
     if (texto) hablar(texto);
 }
 
@@ -391,9 +398,9 @@ function selectMode(mode) {
             setTimeout(() => {
                 hablar(
                     "¿Cómo prefiere interactuar? " +
-                    "Opción uno: Lector de pantalla del dispositivo. Usa el TTS de su teléfono, la interfaz se muestra completa y puede pedir normalmente. " +
+                    "Opción uno: Lector de pantalla del dispositivo. Usa el TTS de su teléfono. " +
                     "Opción dos: Chatbot IA por voz. El asistente de voz inteligente le atiende hablando. " +
-                    "Opción tres: Solo alto contraste y texto grande, sin TTS. " +
+                    "Opción tres: Lector de voz de la página. Alto contraste y lector integrado activado automáticamente. " +
                     "Diga uno, dos o tres, o toque el botón.",
                     () => iniciarMicElegirCiego()
                 );
@@ -518,12 +525,20 @@ function aplicarModo(mode, blindChoice = null) {
                     if (titulo) titulo.focus();
                 }, 300);
             } else {
-                // reader: sin TTS, burbuja nunca visible
-                isReadAloud = false;
-                voiceAssistantEnabled = false;
-                document.getElementById('btn-read').classList.remove('active');
-                document.removeEventListener('click', leerElemento);
+                // reader: TTS de la página activado automáticamente (no chatbot, no burbuja)
+                isReadAloud = true;
+                voiceAssistantEnabled = true;
+                document.getElementById('btn-read').classList.add('active');
+                document.addEventListener('click', leerElemento);
                 document.getElementById('blind-bubble').classList.add('hidden');
+                // Anunciar activación por voz de la página
+                setTimeout(() => {
+                    hablar(
+                        "Lector de voz de la página activado. Puede navegar el menú y escuchar las descripciones de cada platillo. " +
+                        "Toque cualquier tarjeta para escuchar el platillo. " +
+                        "Toque el botón Agregar para añadirlo a su orden."
+                    );
+                }, 300);
             }
             break;
         case 'quiet':
