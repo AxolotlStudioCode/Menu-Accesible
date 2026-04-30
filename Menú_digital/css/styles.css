@@ -1789,3 +1789,120 @@ body.blind-mode .video-info {
         padding: 24px 16px 20px;
     }
 }
+
+/* ==========================================
+   MODO CIEGO – TTS DEL DISPOSITIVO
+   ========================================== */
+/* La interfaz se ve igual que los demás modos pero con mejoras de accesibilidad ARIA */
+body.blind-tts-mode .card {
+    outline: 3px solid transparent;
+    transition: outline-color 0.2s;
+}
+body.blind-tts-mode .card:focus-within {
+    outline-color: var(--primary);
+}
+/* Hacer que el título de sección sea enfocable para que VoiceOver lo anuncie */
+body.blind-tts-mode .section-title {
+    outline: none;
+}
+
+/* ==========================================
+   DESCRIPCIÓN INLINE DE VIDEO (todos los modos)
+   ========================================== */
+.card-video-desc {
+    margin-top: 10px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    animation: slideDown 0.25s ease;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.video-desc-inner {
+    background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.video-desc-text {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+.video-desc-ingredients {
+    font-size: 0.85rem;
+    color: var(--text-main);
+}
+.video-desc-ingredients summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    list-style: none;
+    user-select: none;
+}
+.video-desc-ingredients summary::-webkit-details-marker { display: none; }
+.video-desc-ingredients ul {
+    margin-top: 8px;
+    padding-left: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+}
+.video-desc-ingredients li {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+.btn-open-video-modal {
+    align-self: flex-start;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+}
+.btn-open-video-modal:hover {
+    background: var(--primary-dark);
+}
+
+/* Ajuste del botón Ver Video cuando está expandido */
+.btn-video-toggle[aria-expanded="true"] {
+    background: #EFF6FF;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Alto contraste para descripciones inline */
+body.high-contrast .video-desc-inner {
+    background: #000;
+    border-color: #FFD700;
+    color: #FFD700;
+}
+body.high-contrast .video-desc-text,
+body.high-contrast .video-desc-ingredients {
+    color: #FFD700;
+}
+body.high-contrast .btn-open-video-modal {
+    background: #FFD700;
+    color: #000;
+}
+
+@media (max-width: 480px) {
+    .video-desc-ingredients ul {
+        grid-template-columns: 1fr;
+    }
+}
