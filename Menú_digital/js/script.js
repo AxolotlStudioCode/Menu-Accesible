@@ -1,1933 +1,1101 @@
-/* ==========================================
-   VARIABLES Y RESET
-   ========================================== */
-:root {
-    --bg-app: #F8FAFC;
-    --bg-card: #FFFFFF;
-    --bg-panel: #FFFFFF;
-    
-    --primary: #2563EB;
-    --primary-dark: #1D4ED8;
-    --primary-light: #DBEAFE;
-    
-    --secondary: #64748B;
-    --success: #10B981;
-    --warning: #F59E0B;
-    --danger: #EF4444;
-    
-    --text-main: #0F172A;
-    --text-secondary: #475569;
-    --text-light: #94A3B8;
-    
-    --border: #E2E8F0;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
-    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1);
-    
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    
-    --font-size-base: 16px;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body { 
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background-color: var(--bg-app); 
-    color: var(--text-main); 
-    font-size: var(--font-size-base); 
-    line-height: 1.6;
-    transition: background-color 0.3s;
-}
-
-/* ==========================================
-   MODO CIEGO – interfaz simplificada con burbuja
-   ========================================== */
-body.blind-voice-simplified {
-    background-color: #1a1a2e;
-}
-
-/* Ocultar todo excepto la burbuja y el chatbot (que quedará escondido pero funcional) */
-body.blind-voice-simplified header,
-body.blind-voice-simplified .main-container,
-body.blind-voice-simplified .accessibility-panel,
-body.blind-voice-simplified .chatbot-toggle,
-body.blind-voice-simplified .video-modal,
-body.blind-voice-simplified .welcome-overlay {
-    display: none !important;
-}
-
-/* Mostrar la burbuja central — SOLO cuando no tiene la clase hidden */
-body.blind-voice-simplified .blind-bubble:not(.hidden) {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-    gap: 0;
-}
-
-/* La clase .hidden SIEMPRE oculta la burbuja, sin excepción */
-.blind-bubble.hidden {
-    display: none !important;
-}
-
-.bubble-circle {
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background: linear-gradient(145deg, #3b82f6, #1d4ed8);
-    box-shadow: 0 10px 40px rgba(37, 99, 235, 0.6), 0 0 0 0 rgba(37,99,235,0.4);
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    z-index: 2;
-}
-
-.bubble-icon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 70px;
-    height: 70px;
-    color: white;
-    font-size: 2.2rem;
-    transition: all 0.3s ease;
-    z-index: 3;
-}
-
-.bubble-tap-hint {
-    font-size: 0.55rem;
-    font-weight: 600;
-    color: rgba(255,255,255,0.85);
-    text-align: center;
-    line-height: 1.2;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-    text-transform: uppercase;
-    pointer-events: none;
-}
-
-/* Ocultar hint cuando está hablando o escuchando */
-.bubble-circle.speaking .bubble-tap-hint,
-.bubble-circle.listening .bubble-tap-hint {
-    display: none;
-}
-
-.bubble-waves {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    display: none;
-}
-.bubble-waves span {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.3);
-    animation: waveExpand 1.8s ease-out infinite;
-}
-.bubble-waves span:nth-child(2) { animation-delay: 0.5s; }
-.bubble-waves span:nth-child(3) { animation-delay: 1s; }
-
-@keyframes waveExpand {
-    0%   { transform: scale(1); opacity: 0.6; }
-    100% { transform: scale(1.8); opacity: 0; }
-}
-
-.bubble-outer-ring {
-    position: absolute;
-    width: 220px;
-    height: 220px;
-    border-radius: 50%;
-    border: 2px solid rgba(59,130,246,0.3);
-    animation: none;
-    z-index: 1;
-}
-
-.bubble-status {
-    margin-top: 24px;
-    color: rgba(255,255,255,0.85);
-    font-size: 1.1rem;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    text-align: center;
-    z-index: 2;
-}
-
-/* Botón transparente sobre la burbuja para capturar taps */
-.bubble-tap-btn {
-    position: absolute;
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    z-index: 10;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.bubble-circle.speaking {
-    animation: speakPulse 0.8s infinite alternate;
-    box-shadow: 0 10px 50px rgba(37, 99, 235, 0.8), 0 0 0 8px rgba(37,99,235,0.15);
-    background: linear-gradient(145deg, #60a5fa, #2563eb);
-}
-.bubble-circle.speaking .bubble-waves { display: block; }
-.bubble-circle.speaking .bubble-icon { font-size: 2.6rem; }
-
-.bubble-circle.listening {
-    animation: listenPulse 0.6s infinite alternate;
-    box-shadow: 0 10px 50px rgba(16, 185, 129, 0.8), 0 0 0 8px rgba(16,185,129,0.15);
-    background: linear-gradient(145deg, #34d399, #059669);
-}
-.bubble-circle.listening .bubble-waves { display: block; }
-.bubble-circle.listening .bubble-icon { color: white; }
-
-.bubble-circle.idle {
-    box-shadow: 0 10px 40px rgba(37, 99, 235, 0.4);
-}
-
-.bubble-circle.speaking {
-    animation: speakPulse 0.8s infinite alternate;
-}
-
-.bubble-circle.listening {
-    animation: listenPulse 0.6s infinite alternate;
-}
-
-@keyframes speakPulse {
-    from { transform: scale(1); opacity: 1; }
-    to   { transform: scale(1.15); opacity: 0.9; }
-}
-
-@keyframes listenPulse {
-    from { transform: scale(1); }
-    to   { transform: scale(1.1); }
-}
-
-.bubble-text {
-    margin-top: 14px;
-    color: rgba(255,255,255,0.75);
-    font-size: 1rem;
-    font-weight: 400;
-    text-align: center;
-    max-width: 320px;
-    line-height: 1.5;
-    min-height: 24px;
-}
-
-/* El chatbot permanece oculto visualmente pero funcional; 
-   se puede acceder a él con teclado si se desea, pero en pantalla no se ve */
-body.blind-voice-simplified .chatbot-container {
-    display: none; /* lo ocultamos por completo, la interacción es voz/texto sin interfaz de chat visible */
-}
-
-/* Opcional: si se necesita un input mínimo, podríamos mostrarlo, pero por ahora oculto */
-
-/* ==========================================
-   HEADER
-   ========================================== */
-header {
-    background: var(--bg-card);
-    padding: 25px 40px;
-    box-shadow: var(--shadow-sm);
-    border-bottom: 2px solid var(--border);
-}
-
-.logo {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.logo-icon {
-    width: 50px;
-    height: 50px;
-    background: var(--primary);
-    color: white;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    flex-shrink: 0;
-}
-
-.logo-text h1 {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: var(--text-main);
-    margin-bottom: 4px;
-}
-
-.logo-text p {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-}
-
-/* ==========================================
-   LAYOUT PRINCIPAL
-   ========================================== */
-.main-container {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: 30px;
-    max-width: 1400px;
-    margin: 40px auto;
-    padding: 0 30px;
-}
-
-.section-header {
-    grid-column: 1 / -1;
-    margin-bottom: 10px;
-}
-
-.section-title {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--text-main);
-    margin-bottom: 10px;
-}
-
-.section-subtitle {
-    color: var(--text-secondary);
-    font-size: 1.05rem;
-    max-width: 700px;
-}
-
-.menu-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 25px;
-    align-content: start;
-}
-
-/* ==========================================
-   TARJETAS DE PLATILLOS
-   ========================================== */
-.card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    display: flex;
-    flex-direction: column;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-xl);
-}
-
-.card-image {
-    position: relative;
-    height: 220px;
-    overflow: hidden;
-}
-
-.card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.5s ease;
-}
-
-.card:hover .card-image img {
-    transform: scale(1.08);
-}
-
-.card-overlay {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-}
-
-.price-tag {
-    background: var(--primary);
-    color: white;
-    padding: 8px 16px;
-    border-radius: var(--radius-xl);
-    font-weight: 700;
-    font-size: 1.1rem;
-    box-shadow: var(--shadow-md);
-    display: inline-block;
-}
-
-.card-body {
-    padding: 22px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.allergen-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 14px;
-}
-
-.badge {
-    font-size: 0.72rem;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: var(--bg-app);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    white-space: nowrap;
-}
-
-.badge.gluten { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
-.badge.dairy  { background: #E0F2FE; color: #075985; border-color: #7DD3FC; }
-.badge.egg    { background: #FEF9C3; color: #713F12; border-color: #FDE047; }
-.badge.fish   { background: #ECFDF5; color: #065F46; border-color: #6EE7B7; }
-.badge.soy    { background: #F0FDF4; color: #14532D; border-color: #86EFAC; }
-.badge.pork   { background: #FFF1F2; color: #9F1239; border-color: #FDA4AF; }
-
-.card h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--text-main);
-}
-
-.card-description {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    margin-bottom: 20px;
-    line-height: 1.6;
-    flex: 1;
-}
-
-.card-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: auto;
-    width: 100%;
-    overflow: hidden;
-}
-
-/* ==========================================
-   BOTONES
-   ========================================== */
-.btn {
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: 600;
-    border: none;
-    padding: 11px 10px;
-    border-radius: var(--radius-md);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    transition: all 0.2s ease;
-    font-size: 0.85rem;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
-}
-
-.btn-primary:hover {
-    background: var(--primary-dark);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-.btn-secondary {
-    background: transparent;
-    color: var(--primary);
-    border: 2px solid var(--primary);
-}
-
-.btn-secondary:hover {
-    background: var(--primary-light);
-}
-
-.btn-download {
-    width: 100%;
-    background: var(--success);
-    color: white;
-    font-size: 1rem;
-    padding: 14px;
-    margin-top: 15px;
-    border-radius: var(--radius-md);
-}
-
-.btn-download:hover {
-    background: #059669;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
-}
-
-/* ==========================================
-   SIDEBAR / ORDEN
-   ========================================== */
-.sidebar {
-    position: sticky;
-    top: 30px;
-    height: fit-content;
-}
-
-.order-box {
-    background: var(--bg-card);
-    padding: 28px;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
-}
-
-.order-box h3 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 16px;
-    padding-bottom: 14px;
-    border-bottom: 2px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--text-main);
-}
-
-.empty-msg {
-    text-align: center;
-    color: var(--text-light);
-    padding: 30px 0 10px;
-    font-style: italic;
-    font-size: 0.95rem;
-}
-
-.order-list {
-    min-height: 60px;
-    margin-bottom: 16px;
-    max-height: 350px;
-    overflow-y: auto;
-}
-
-.order-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    animation: slideIn 0.3s ease;
-    gap: 8px;
-}
-
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.order-item > span:first-child {
-    font-weight: 500;
-    color: var(--text-main);
-    font-size: 0.9rem;
-    flex: 1;
-}
-
-.order-item-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-}
-
-.order-item-price {
-    font-weight: 700;
-    color: var(--primary);
-    font-size: 1rem;
-}
-
-.btn-remove {
-    background: none;
-    border: none;
-    color: var(--text-light);
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s;
-    font-size: 0.85rem;
-    padding: 0;
-}
-
-.btn-remove:hover {
-    background: #FEE2E2;
-    color: var(--danger);
-}
-
-.order-summary {
-    border-top: 2px solid var(--border);
-    padding-top: 18px;
-    margin-top: 8px;
-}
-
-.total-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: var(--text-main);
-}
-
-#total-precio {
-    color: var(--success);
-}
-
-.help-text {
-    text-align: center;
-    font-size: 0.82rem;
-    color: var(--text-light);
-    margin-top: 10px;
-}
-
-/* ==========================================
-   PANTALLA DE BIENVENIDA
-   ========================================== */
-.welcome-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(8px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    transition: opacity 0.5s ease;
-}
-
-.welcome-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.welcome-modal {
-    background: var(--bg-card);
-    padding: 45px;
-    border-radius: var(--radius-xl);
-    max-width: 750px;
-    width: 100%;
-    text-align: center;
-    box-shadow: var(--shadow-xl);
-    animation: modalSlideIn 0.4s ease;
-    max-height: 90vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-@keyframes modalSlideIn {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.welcome-speak {
-    background: var(--primary-light);
-    color: var(--primary);
-    border: none;
-    padding: 12px 24px;
-    border-radius: var(--radius-xl);
-    font-weight: 600;
-    margin-bottom: 28px;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-    font-size: 1rem;
-}
-
-.welcome-speak:hover {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.05);
-}
-
-.welcome-modal h2 {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 2rem;
-    font-weight: 800;
-    margin-bottom: 12px;
-    color: var(--text-main);
-}
-
-.welcome-sub {
-    color: var(--text-secondary);
-    font-size: 1rem;
-    margin-bottom: 32px;
-    line-height: 1.6;
-}
-
-.welcome-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 28px;
-}
-
-.welcome-option {
-    background: var(--bg-app);
-    border: 2px solid var(--border);
-    padding: 24px 18px;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    font-family: inherit;
-    text-align: center;
-}
-
-.welcome-option:hover {
-    border-color: var(--primary);
-    background: white;
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-}
-
-.welcome-option:focus {
-    outline: 3px solid var(--primary);
-    outline-offset: 2px;
-}
-
-.option-icon-wrapper {
-    width: 58px;
-    height: 58px;
-    background: var(--primary-light);
-    color: var(--primary);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.4rem;
-    transition: all 0.3s;
-}
-
-.welcome-option:hover .option-icon-wrapper {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.1);
-}
-
-.option-title {
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--text-main);
-    display: block;
-}
-
-.option-desc {
-    font-size: 0.83rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-    display: block;
-}
-
-/* ==========================================
-   PANTALLA TTS PROMPT (nueva, primera pantalla)
-   ========================================== */
-.tts-prompt-modal {
-    max-width: 500px !important;
-    padding: 48px 40px !important;
-}
-
-.tts-prompt-icon {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--primary-light), #bfdbfe);
-    color: var(--primary);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    margin: 0 auto 24px;
-    box-shadow: 0 8px 24px rgba(37,99,235,0.15);
-}
-
-.tts-prompt-buttons {
-    display: flex;
-    gap: 16px;
-    margin: 28px 0 20px;
-}
-
-.tts-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 24px 16px;
-    border-radius: var(--radius-lg);
-    border: 2px solid var(--border);
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.25s ease;
-    background: var(--bg-app);
-}
-
-.tts-btn i { font-size: 1.8rem; }
-
-.tts-btn span {
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--text-main);
-}
-
-.tts-btn small {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    line-height: 1.3;
-}
-
-.tts-btn-yes {
-    border-color: var(--primary);
-    background: var(--primary-light);
-}
-.tts-btn-yes i { color: var(--primary); }
-.tts-btn-yes:hover {
-    background: var(--primary);
-    border-color: var(--primary);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
-}
-.tts-btn-yes:hover i,
-.tts-btn-yes:hover span,
-.tts-btn-yes:hover small { color: white; }
-
-.tts-btn-no:hover {
-    border-color: var(--text-main);
-    background: var(--text-main);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
-}
-.tts-btn-no:hover i,
-.tts-btn-no:hover span,
-.tts-btn-no:hover small { color: white; }
-
-.tts-prompt-hint {
-    font-size: 0.83rem;
-    color: var(--text-light);
-    line-height: 1.5;
-    border-top: 1px solid var(--border);
-    padding-top: 16px;
-}
-.tts-prompt-hint i { color: var(--primary); margin-right: 4px; }
-
-/* Botón silenciar — esquina superior derecha del modal de modos */
-.btn-mute-tts {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: #f1f5f9;
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    padding: 8px 16px;
-    border-radius: var(--radius-xl);
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-    font-size: 0.85rem;
-}
-.btn-mute-tts:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
-
-/* El modal de modos necesita position relative para el botón absoluto */
-.welcome-modal {
-    position: relative;
-}
-
-/* Ensure speak button has enough top space to clear the absolute mute button */
-.welcome-modal .welcome-speak {
-    margin-top: 44px;
-}
-
-.welcome-skip {
-    background: none;
-    border: none;
-    color: var(--text-light);
-    font-size: 0.9rem;
-    cursor: pointer;
-    text-decoration: underline;
-    transition: color 0.2s;
-    font-family: inherit;
-}
-
-.welcome-skip:hover {
-    color: var(--text-secondary);
-}
-
-/* ==========================================
-   PANEL DE ACCESIBILIDAD
-   ========================================== */
-.accessibility-panel {
-    position: fixed;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 1000;
-}
-
-.toggle-panel {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-right: none;
-    padding: 16px;
-    font-size: 1.2rem;
-    color: var(--text-main);
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
-    box-shadow: var(--shadow-md);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.toggle-panel:hover {
-    background: var(--primary);
-    color: white;
-}
-
-.panel-content {
-    position: absolute;
-    right: 100%;
-    top: 0;
-    background: var(--bg-card);
-    padding: 24px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    width: 270px;
-    display: none;
-    border: 1px solid var(--border);
-    margin-right: 12px;
-}
-
-.panel-content.active {
-    display: block;
-}
-
-.panel-content h3 {
-    margin-bottom: 18px;
-    font-size: 1.1rem;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 700;
-}
-
-.access-option {
-    margin-bottom: 16px;
-}
-
-.access-option label {
-    display: block;
-    font-size: 0.88rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text-secondary);
-}
-
-.btn-group {
-    display: flex;
-    gap: 8px;
-}
-
-.btn-group button {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid var(--border);
-    background: var(--bg-app);
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-}
-
-.btn-group button:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-.btn-toggle {
-    width: 100%;
-    padding: 12px;
-    background: var(--bg-app);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    transition: all 0.2s;
-    font-family: inherit;
-    font-size: 0.95rem;
-}
-
-.btn-toggle.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-/* ==========================================
-   CHATBOT
-   ========================================== */
-.chatbot-container {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    z-index: 1000;
-}
-
-.chatbot-toggle {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 15px 26px;
-    border-radius: 30px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-family: inherit;
-}
-
-.chatbot-toggle:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-xl);
-    background: var(--primary-dark);
-}
-
-.chatbot-window {
-    position: absolute;
-    bottom: 75px;
-    right: 0;
-    width: 400px;
-    height: 540px;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.chatbot-window.active {
-    display: flex;
-}
-
-.chatbot-header {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-    padding: 18px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.chatbot-header-content {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-}
-
-.chatbot-avatar {
-    width: 42px;
-    height: 42px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-
-.chatbot-info h4 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin-bottom: 2px;
-}
-
-.status-indicator {
-    font-size: 0.82rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    opacity: 0.9;
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    background: #10B981;
-    border-radius: 50%;
-    display: inline-block;
-    animation: statusPulse 2s infinite;
-    flex-shrink: 0;
-}
-
-@keyframes statusPulse {
-    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-.chatbot-close {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 0.95rem;
-    transition: background 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.chatbot-close:hover {
-    background: rgba(255,255,255,0.35);
-}
-
-.chatbot-messages {
-    flex: 1;
-    padding: 18px;
-    overflow-y: auto;
-    background: var(--bg-app);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.message {
-    animation: messageSlide 0.3s ease;
-    display: flex;
-}
-
-.bot-message  { justify-content: flex-start; }
-.user-message { justify-content: flex-end; }
-
-@keyframes messageSlide {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-.message-content {
-    padding: 12px 16px;
-    border-radius: var(--radius-lg);
-    font-size: 0.92rem;
-    line-height: 1.5;
-    max-width: 85%;
-}
-
-.bot-message .message-content {
-    background: white;
-    border: 1px solid var(--border);
-    color: var(--text-main);
-    border-bottom-left-radius: 4px;
-}
-
-.user-message .message-content {
-    background: var(--primary);
-    color: white;
-    border-bottom-right-radius: 4px;
-}
-
-.message-time {
-    font-size: 0.72rem;
-    margin-top: 5px;
-    display: block;
-    opacity: 0.65;
-}
-
-.typing-dots {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    height: 20px;
-}
-
-.typing-dots span {
-    width: 7px;
-    height: 7px;
-    background: var(--text-light);
-    border-radius: 50%;
-    animation: typingBounce 1.2s infinite;
-}
-
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typingBounce {
-    0%, 60%, 100% { transform: translateY(0); }
-    30%            { transform: translateY(-6px); }
-}
-
-.chatbot-input-area {
-    padding: 16px;
-    background: white;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.mic-btn, .send-btn {
-    background: var(--secondary);
-    color: white;
-    border: none;
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    min-height: 46px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 1.1rem;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    padding: 0;
-    line-height: 1;
-}
-
-.mic-btn:hover {
-    background: var(--text-main);
-    transform: scale(1.08);
-}
-
-.mic-btn.listening {
-    background: var(--danger);
-    animation: statusPulse 1.2s infinite;
-}
-
-.send-btn {
-    background: var(--primary);
-}
-
-.send-btn:hover {
-    background: var(--primary-dark);
-    transform: scale(1.08);
-}
-
-#chatbot-input {
-    flex: 1;
-    padding: 11px 18px;
-    border: 2px solid var(--border);
-    border-radius: 25px;
-    font-size: 0.93rem;
-    outline: none;
-    transition: border-color 0.2s;
-    font-family: inherit;
-    min-width: 0;
-}
-
-#chatbot-input:focus {
-    border-color: var(--primary);
-}
-
-/* ==========================================
-   MODAL DE VIDEO
-   ========================================== */
-.video-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.9);
-    z-index: 2000;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
-
-.video-modal.active {
-    display: flex;
-}
-
-.modal-content {
-    background: white;
-    border-radius: var(--radius-lg);
-    max-width: 750px;
-    width: 100%;
-    max-height: 92vh;
-    overflow-y: auto;
-    padding: 35px;
-    position: relative;
-    animation: modalZoom 0.3s ease;
-}
-
-@keyframes modalZoom {
-    from { opacity: 0; transform: scale(0.95); }
-    to   { opacity: 1; transform: scale(1); }
-}
-
-.close-modal {
-    position: absolute;
-    top: 18px;
-    right: 18px;
-    background: var(--bg-app);
-    border: none;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.close-modal:hover {
-    background: var(--text-main);
-    color: white;
-}
-
-#video-title {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.6rem;
-    margin-bottom: 14px;
-    padding-right: 48px;
-}
-
-.video-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--primary-light);
-    color: var(--primary);
-    padding: 7px 16px;
-    border-radius: var(--radius-xl);
-    font-size: 0.88rem;
-    font-weight: 600;
-    margin-bottom: 20px;
-}
-
-.video-container {
-    position: relative;
-    padding-bottom: 56.25%;
-    height: 0;
-    margin-bottom: 24px;
-    background: black;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-}
-
-.video-container iframe {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.video-info h3 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 10px;
-    color: var(--text-main);
-}
-
-.video-info p {
-    color: var(--text-secondary);
-    line-height: 1.7;
-    font-size: 0.97rem;
-}
-
-body.blind-mode .video-info {
-    display: none;
-}
-
-/* ==========================================
-   RESPONSIVE (se mantiene completo)
-   ========================================== */
-@media (max-width: 1100px) {
-    .main-container {
-        grid-template-columns: 1fr;
-        gap: 24px;
-        padding: 0 20px;
-        margin: 28px auto;
-    }
-    .sidebar {
-        position: relative;
-        top: 0;
-    }
-    .menu-grid {
-        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 20px;
-    }
-    .section-title {
-        font-size: 1.7rem;
-    }
-}
-
-@media (max-width: 768px) {
-    header {
-        padding: 16px 18px;
-    }
-    .logo {
-        gap: 12px;
-    }
-    .logo-icon {
-        width: 42px;
-        height: 42px;
-        font-size: 1.3rem;
-    }
-    .logo-text h1 {
-        font-size: 1.3rem;
-    }
-    .logo-text p {
-        font-size: 0.82rem;
-    }
-    .main-container {
-        padding: 0 14px;
-        margin: 20px auto;
-        gap: 20px;
-    }
-    .menu-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-    .card-image {
-        height: 180px;
-    }
-    .card-body {
-        padding: 16px;
-    }
-    .card h3 {
-        font-size: 1.1rem;
-    }
-    .card-description {
-        font-size: 0.88rem;
-    }
-    .btn {
-        padding: 12px 10px;
-        font-size: 0.88rem;
-        min-height: 44px;
-    }
-    .card-actions {
-        flex-direction: row;
-        gap: 8px;
-    }
-    .section-title {
-        font-size: 1.4rem;
-    }
-    .section-subtitle {
-        font-size: 0.9rem;
-    }
-    .welcome-options {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    .welcome-modal {
-        padding: 24px 16px;
-    }
-    .welcome-modal h2 {
-        font-size: 1.4rem;
-    }
-    .welcome-sub {
-        font-size: 0.9rem;
-        margin-bottom: 20px;
-    }
-    .welcome-option {
-        padding: 18px 14px;
-    }
-    .option-icon-wrapper {
-        width: 46px;
-        height: 46px;
-        font-size: 1.2rem;
-    }
-    .option-title {
-        font-size: 0.9rem;
-    }
-    .option-desc {
-        font-size: 0.78rem;
-    }
-    .chatbot-window {
-        width: calc(100vw - 20px);
-        right: -5px;
-        height: 60vh;
-        max-height: 500px;
-    }
-    .chatbot-container {
-        bottom: 16px;
-        right: 16px;
-    }
-    .chatbot-toggle {
-        padding: 12px 18px;
-        font-size: 0.85rem;
-    }
-    .chatbot-toggle span {
-        display: none;
-    }
-    .accessibility-panel {
-        display: none;
-    }
-    .order-box {
-        padding: 20px 16px;
-    }
-    .order-box h3 {
-        font-size: 1.05rem;
-    }
-    .total-row {
-        font-size: 1.15rem;
-    }
-    .modal-content {
-        padding: 20px 16px;
-    }
-    #video-title {
-        font-size: 1.3rem;
-    }
-}
-
-@media (max-width: 480px) {
-    header {
-        padding: 12px 14px;
-    }
-    .logo {
-        gap: 10px;
-    }
-    .logo-icon {
-        width: 36px;
-        height: 36px;
-        font-size: 1.1rem;
-    }
-    .logo-text h1 {
-        font-size: 1.15rem;
-    }
-    .logo-text p {
-        font-size: 0.72rem;
-        line-height: 1.3;
-    }
-    .main-container {
-        padding: 0 10px;
-        margin: 14px auto;
-        gap: 16px;
-    }
-    .menu-grid {
-        gap: 12px;
-    }
-    .card-image {
-        height: 160px;
-    }
-    .card-body {
-        padding: 14px;
-    }
-    .card-actions {
-        flex-direction: column;
-        gap: 6px;
-    }
-    .btn {
-        width: 100%;
-        min-height: 46px;
-        font-size: 0.9rem;
-    }
-    .price-tag {
-        padding: 6px 12px;
-        font-size: 0.95rem;
-    }
-    .allergen-badges {
-        gap: 4px;
-    }
-    .badge {
-        font-size: 0.68rem;
-        padding: 3px 7px;
-    }
-    .welcome-modal {
-        max-height: 85vh;
-        padding: 24px 18px;
-    }
-    .welcome-modal h2 {
-        font-size: 1.25rem;
-    }
-    .welcome-speak {
-        padding: 10px 16px;
-        font-size: 0.85rem;
-        /* Ensure it doesn't overlap with the absolute mute button */
-        margin-top: 52px;
-        margin-bottom: 20px;
-    }
-    /* Fix for mute button overlapping speak-instructions on mobile */
-    .btn-mute-tts {
-        top: 12px;
-        right: 12px;
-        padding: 6px 12px;
-        font-size: 0.78rem;
-    }
-    .chatbot-window {
-        width: calc(100vw - 12px);
-        right: -2px;
-        bottom: 65px;
-        height: 55vh;
-        border-radius: var(--radius-md);
-    }
-    .chatbot-header {
-        padding: 14px 16px;
-    }
-    .chatbot-messages {
-        padding: 12px;
-    }
-    .message-content {
-        font-size: 0.85rem;
-        padding: 10px 14px;
-    }
-    .chatbot-input-area {
-        padding: 10px;
-        gap: 6px;
-    }
-    .mic-btn, .send-btn {
-        width: 42px;
-        height: 42px;
-        min-width: 42px;
-        min-height: 42px;
-    }
-    #chatbot-input {
-        padding: 10px 14px;
-        font-size: 0.85rem;
-    }
-    .order-box {
-        padding: 16px 12px;
-    }
-    .section-title {
-        font-size: 1.25rem;
-    }
-    .section-subtitle {
-        font-size: 0.82rem;
-    }
-    .modal-content {
-        padding: 16px 12px;
-        max-height: 95vh;
-    }
-    #video-title {
-        font-size: 1.15rem;
-        padding-right: 40px;
-    }
-    .close-modal {
-        top: 10px;
-        right: 10px;
-        width: 32px;
-        height: 32px;
-    }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-    .welcome-modal {
-        padding: 20px;
-        max-height: 95vh;
-        overflow-y: auto;
-    }
-    .welcome-options {
-        grid-template-columns: 1fr 1fr;
-    }
-    .chatbot-window {
-        height: 85vh;
-    }
-}
-
-/* ==========================================
-   MODAL DE INGREDIENTES
-   ========================================== */
-.ingredientes-modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(4px);
-    z-index: 3000;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-.ingredientes-modal-overlay.active {
-    display: flex;
-}
-.ingredientes-modal-content {
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    padding: 32px 28px 28px;
-    max-width: 480px;
-    width: 100%;
-    position: relative;
-    box-shadow: var(--shadow-xl);
-    animation: modalIn 0.25s ease;
-    max-height: 85vh;
-    overflow-y: auto;
-}
-@keyframes modalIn {
-    from { opacity: 0; transform: scale(0.93) translateY(12px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-.ingredientes-modal-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: var(--bg-app);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: all 0.2s;
-    font-size: 0.85rem;
-}
-.ingredientes-modal-close:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
-.ingredientes-modal-content h3 {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.4rem;
-    font-weight: 800;
-    margin-bottom: 6px;
-    color: var(--text-main);
-    padding-right: 30px;
-}
-.ing-modal-sub {
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    margin-bottom: 20px;
-}
-.ing-checks-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 24px;
-}
-.ing-check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg-app);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 10px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-size: 0.88rem;
-    color: var(--text-main);
-}
-.ing-check:has(input:checked) {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    color: var(--primary-dark);
-}
-.ing-check input[type="checkbox"] {
-    accent-color: var(--primary);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.ing-modal-actions {
-    display: flex;
-    gap: 10px;
-}
-.ing-modal-actions .btn {
-    flex: 1;
-}
-@media (max-width: 480px) {
-    .ing-checks-grid {
-        grid-template-columns: 1fr;
-    }
-    .ing-modal-actions {
-        flex-direction: column;
-    }
-    .ingredientes-modal-content {
-        padding: 24px 16px 20px;
-    }
-}
-
-/* ==========================================
-   MODO CIEGO – TTS DEL DISPOSITIVO
-   ========================================== */
-/* La interfaz se ve igual que los demás modos pero con mejoras de accesibilidad ARIA */
-body.blind-tts-mode .card {
-    outline: 3px solid transparent;
-    transition: outline-color 0.2s;
-}
-body.blind-tts-mode .card:focus-within {
-    outline-color: var(--primary);
-}
-/* Hacer que el título de sección sea enfocable para que VoiceOver lo anuncie */
-body.blind-tts-mode .section-title {
-    outline: none;
-}
-
-/* ==========================================
-   DESCRIPCIÓN INLINE DE VIDEO (todos los modos)
-   ========================================== */
-.card-video-desc {
-    margin-top: 10px;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    animation: slideDown 0.25s ease;
-}
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-.video-desc-inner {
-    background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.video-desc-text {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.55;
-}
-.video-desc-ingredients {
-    font-size: 0.85rem;
-    color: var(--text-main);
-}
-.video-desc-ingredients summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    list-style: none;
-    user-select: none;
-}
-.video-desc-ingredients summary::-webkit-details-marker { display: none; }
-.video-desc-ingredients ul {
-    margin-top: 8px;
-    padding-left: 18px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 12px;
-}
-.video-desc-ingredients li {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-}
-.btn-open-video-modal {
-    align-self: flex-start;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 8px 14px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.2s;
-}
-.btn-open-video-modal:hover {
-    background: var(--primary-dark);
-}
-
-/* Ajuste del botón Ver Video cuando está expandido */
-.btn-video-toggle[aria-expanded="true"] {
-    background: #EFF6FF;
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-/* Alto contraste para descripciones inline */
-body.high-contrast .video-desc-inner {
-    background: #000;
-    border-color: #FFD700;
-    color: #FFD700;
-}
-body.high-contrast .video-desc-text,
-body.high-contrast .video-desc-ingredients {
-    color: #FFD700;
-}
-body.high-contrast .btn-open-video-modal {
-    background: #FFD700;
-    color: #000;
-}
-
-@media (max-width: 480px) {
-    .video-desc-ingredients ul {
-        grid-template-columns: 1fr;
-    }
-}
+// ==========================================
+// VARIABLES GLOBALES
+// ==========================================
+let total = 0;
+let orden = [];
+let isReadAloud = false;
+let isHighContrast = false;
+let isBlindMode = false;
+let speechSynth = window.speechSynthesis;
+let voiceAssistantEnabled = true; // controla si bot habla y mic está activo
+
+// Sistema de doble-tap para modo ciego
+let pendingAction = null;
+let pendingTimeout = null;
+
+// Datos de platillos
+const platillosData = {
+    'Tacos al Pastor': { 
+        desc: 'Tres auténticos tacos de cerdo marinado al estilo pastor, preparados con una mezcla artesanal de chiles guajillo y ancho, achiote, especias y zumo de piña natural. La carne se asa lentamente en trompo vertical hasta dorar por fuera y jugosa por dentro. Se sirven sobre tortillas de maíz recién hechas, coronados con trozos de piña fresca caramelizada, cilantro picado y cebolla blanca. Acompañados de salsa roja de chile de árbol, salsa verde tomatillo y rodajas de limón. Una explosión de sabores tradicionales mexicanos que combinan lo ahumado, lo dulce de la piña y el picante de las salsas.',
+        ingredients: ['Carne de cerdo', 'Chile guajillo', 'Chile ancho', 'Piña natural', 'Achiote', 'Cilantro', 'Cebolla', 'Tortillas de maíz'],
+        price: 12.99
+    },
+    'Hamburguesa Clásica': {
+        desc: 'Hamburguesa artesanal con medallón de carne de res molida premium de 200 gramos, formada a mano y cocinada al término medio para conservar todos sus jugos. Se sirve en un suave pan brioche tostado con mantequilla, untado con mayonesa casera y mostaza Dijon. Lleva lechuga romana crujiente, rodajas de tomate maduro, aros de cebolla morada encurtida, pepinillos artesanales y una generosa capa de queso cheddar fundido. Acompañada de papas fritas crujientes y aderezo especial de la casa. El equilibrio perfecto entre lo clásico y lo gourmet.',
+        ingredients: ['Carne de res molida premium', 'Queso cheddar', 'Lechuga romana', 'Tomate', 'Cebolla', 'Pepinillos', 'Pan brioche', 'Salsas especiales'],
+        price: 14.99
+    },
+    'Pizza Margarita': {
+        desc: 'Pizza napolitana clásica horneada en horno de piedra a alta temperatura para lograr una base crujiente por fuera y ligeramente esponjosa por dentro. La masa se elabora artesanalmente con 48 horas de fermentación lenta para desarrollar todo su sabor. Se cubre con salsa de tomates San Marzano importados, aplastados a mano con ajo y albahaca. Encima, generosas porciones de mozzarella di bufala fresca y campana que se funde perfectamente. Al salir del horno se añaden hojas de albahaca fresca, un hilo de aceite de oliva extra virgen y una pizca de sal marina en escamas. Sencilla, honesta y perfecta.',
+        ingredients: ['Masa de pizza artesanal', 'Tomates San Marzano', 'Mozzarella di bufala', 'Albahaca fresca', 'Aceite de oliva extra virgen', 'Sal marina', 'Orégano'],
+        price: 16.99
+    },
+    'Sushi Roll California': {
+        desc: 'Roll de sushi estilo California preparado por nuestro chef con técnica tradicional japonesa. Arroz de sushi sazonado con vinagre de arroz, azúcar y sal, extendido sobre lámina de nori tostada. Se rellena con palitos de imitación de cangrejo, aguacate Hass cremoso maduro en su punto y bastones de pepino fresco. Se enrolla con esterilla de bambú, se reboza en semillas de ajonjolí tostadas y se corta en 8 piezas uniformes. Se sirve con salsa de soya, jengibre en escabeche para limpiar el paladar entre piezas y wasabi al gusto. Una combinación suave, fresca y equilibrada, ideal para quienes se inician en el sushi.',
+        ingredients: ['Arroz para sushi', 'Nori (alga marina)', 'Imitación de cangrejo', 'Aguacate', 'Pepino', 'Mayonesa japonesa', 'Semillas de ajonjolí', 'Salsa de soya'],
+        price: 18.99
+    },
+    'Ensalada César': {
+        desc: 'La icónica ensalada César preparada con la receta original, sin compromisos. Hojas de lechuga romana seleccionadas, lavadas y secadas, troceadas en piezas generosas para mantener su textura crujiente. El aderezo se prepara al momento emulsionando yema de huevo, filete de anchoa, ajo asado, jugo de limón, mostaza Dijon y aceite de oliva hasta lograr una crema sedosa. Se añade queso parmesano reggiano recién rallado en abundancia. Los crutones de pan de campo se hornean con ajo, romero y aceite hasta dorarlos perfectamente. Se termina con pimienta negra recién molida y más parmesano en lascas. Fresca, cremosa y llena de carácter.',
+        ingredients: ['Lechuga romana', 'Queso parmesano', 'Huevo', 'Pan para crutones', 'Aceite de oliva', 'Mostaza Dijon', 'Limón', 'Ajo'],
+        price: 11.99
+    },
+    'Pasta Carbonara': {
+        desc: 'Auténtica pasta carbonara romana elaborada con la receta tradicional, sin crema de leche — como manda la tradición. Espagueti de sémola de trigo duro cocido al dente en agua con sal abundante. La salsa se prepara fuera del fuego mezclando yemas de huevo frescas con queso pecorino romano rallado fino y pimienta negra recién molida en cantidad generosa, creando una emulsión untuosa y sedosa. La panceta curada se dora en sartén hasta quedar crujiente y aromática. Se mezcla todo rápidamente con el calor residual de la pasta para que el huevo no cuaje. El resultado es un plato cremoso, intenso y profundamente sabroso, fiel a la Roma de siempre.',
+        ingredients: ['Espagueti', 'Panceta', 'Queso pecorino romano', 'Huevo', 'Pimienta negra', 'Sal'],
+        price: 15.99
+    },
+    'Pollo Teriyaki': {
+        desc: 'Pechuga de pollo de libre pastoreo marinada durante 12 horas en salsa teriyaki casera elaborada con salsa de soya japonesa, sake, mirin, azúcar morena, jengibre fresco rallado y ajo. Se sella a fuego alto en plancha de hierro para lograr esa costra caramelizada exterior característica, y se termina al horno para conservar toda su jugosidad interior. Se glasea al final con más salsa reducida hasta obtener un acabado brillante y lacado. Se sirve sobre arroz jazmín al vapor, acompañado de verduras salteadas con aceite de sésamo: brócoli, zanahoria, pimientos y ejotes. Un platillo equilibrado, aromático y lleno de umami.',
+        ingredients: ['Pechuga de pollo', 'Salsa de soya', 'Sake', 'Azúcar', 'Jengibre', 'Ajo', 'Vegetales variados'],
+        price: 17.99
+    },
+    'Filete de Salmón': {
+        desc: 'Filete de salmón noruego fresco de 220 gramos, de carne firme, color rosado intenso y sabor suave. Se sella primero en sartén con mantequilla clarificada para lograr una piel crujiente y dorada, luego se termina al horno con hierbas frescas: eneldo, perejil y tomillo. Se baña con beurre blanc de limón amarillo, alcaparras y cebollín para realzar su sabor natural sin opacarlo. Se acompaña de papas cambray asadas con romero y aceite de oliva, más un bouquet de espárragos verdes salteados con mantequilla y flor de sal. Un plato elegante, ligero y nutritivo que celebra la calidad del producto.',
+        ingredients: ['Filete de salmón noruego', 'Limón', 'Mantequilla', 'Perejil', 'Eneldo', 'Papas', 'Espárragos', 'Sal y pimienta'],
+        price: 24.99
+    }
+};
+
+// ==========================================
+// UTILIDAD: FORMATEAR PRECIO PARA TTS
+// ==========================================
+// Convierte 12.99 → "12 pesos con 99 centavos" para evitar que el TTS lo lea como fecha
+function precioParaVoz(precio) {
+    const n = parseFloat(precio);
+    if (isNaN(n)) return precio;
+    const pesos = Math.floor(n);
+    const centavos = Math.round((n - pesos) * 100);
+    if (centavos === 0) return `${pesos} pesos`;
+    return `${pesos} pesos con ${centavos} centavos`;
+}
+
+// ==========================================
+// SISTEMA DE VOZ
+// ==========================================
+function hablar(texto, onEnd) {
+    if (!voiceAssistantEnabled) { if (onEnd) onEnd(); return; }
+    if (speechSynth.speaking) speechSynth.cancel();
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-MX';
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    const circle = document.getElementById('bubble-circle');
+    if (circle && isBlindMode) {
+        circle.classList.remove('listening', 'idle');
+        circle.classList.add('speaking');
+    }
+    utterance.onend = () => {
+        if (circle && isBlindMode) {
+            circle.classList.remove('speaking');
+            circle.classList.add('idle');
+        }
+        if (onEnd) onEnd();
+    };
+    speechSynth.speak(utterance);
+}
+
+// ==========================================
+// SISTEMA DE DOBLE-TAP PARA MODO CIEGO
+// ==========================================
+function blindTap(label, fn, event) {
+    if (!isBlindMode) { fn(); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    if (pendingAction && pendingAction.label === label) {
+        clearPendingAction();
+        hablar('Confirmado. ' + label);
+        fn();
+    } else {
+        clearPendingAction();
+        pendingAction = { fn, label };
+        hablar(label + '. Toque de nuevo para confirmar.');
+        pendingTimeout = setTimeout(() => clearPendingAction(), 6000);
+    }
+}
+function clearPendingAction() {
+    if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+    pendingAction = null;
+}
+
+// ==========================================
+// CARRITO DE COMPRAS
+// ==========================================
+function agregarAlCarrito(nombre, precio, cantidad = 1, removidos = [], agregados = []) {
+    if (cantidad <= 0) return;
+    orden.push({ nombre, precio, cantidad, id: Date.now(), custom: { removed: removidos, added: agregados } });
+    total += precio * cantidad;
+    document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
+    renderizarOrden();
+    if (isReadAloud) hablar(`${nombre} agregado a su orden.`);
+}
+function eliminarDelCarrito(id) {
+    const idx = orden.findIndex(i => i.id === id);
+    if (idx !== -1) {
+        const item = orden[idx];
+        total -= item.precio * item.cantidad;
+        orden.splice(idx, 1);
+        document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
+        renderizarOrden();
+    }
+}
+function renderizarOrden() {
+    const lista = document.getElementById('lista-orden');
+    const mensajeVacio = document.getElementById('mensaje-vacio');
+    lista.innerHTML = '';
+    if (orden.length === 0) {
+        mensajeVacio.style.display = 'block';
+        return;
+    }
+    mensajeVacio.style.display = 'none';
+    orden.forEach((item) => {
+        let extra = '';
+        if (item.custom.removed.length) extra += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) extra += ` (+${item.custom.added.join(', ')})`;
+        const div = document.createElement('div');
+        div.className = 'order-item';
+        div.innerHTML = `<span>${item.nombre} x${item.cantidad}${extra}</span>
+            <div class="order-item-right">
+                <span class="order-item-price">$${(item.precio*item.cantidad).toFixed(2)}</span>
+                <button class="btn-remove" onclick="eliminarDelCarrito(${item.id})"><i class="fas fa-times"></i></button>
+            </div>`;
+        lista.appendChild(div);
+    });
+}
+function descargarOrden() {
+    if (orden.length === 0) { alert('Su orden está vacía.'); return; }
+    let texto = 'MI ORDEN\n' + '='.repeat(30) + '\n\n';
+    orden.forEach((item, i) => {
+        texto += `${i+1}. ${item.nombre} x${item.cantidad}`;
+        if (item.custom.removed.length) texto += ` (sin ${item.custom.removed.join(', ')})`;
+        if (item.custom.added.length) texto += ` (+${item.custom.added.join(', ')})`;
+        texto += ` - $${(item.precio*item.cantidad).toFixed(2)}\n`;
+    });
+    texto += '\n' + '-'.repeat(30) + '\nTotal: $' + total.toFixed(2) + '\n\nMuestre esta pantalla al personal.';
+    const blob = new Blob([texto], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mi-orden.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (isReadAloud) hablar('Orden descargada. Muestre el archivo al personal.');
+}
+
+// ==========================================
+// MODAL DE INGREDIENTES (para clientes videntes)
+// ==========================================
+let ingredienteModalCallback = null;
+
+function abrirModalIngredientes(nombre, precio) {
+    const data = platillosData[nombre];
+    if (!data) { agregarAlCarrito(nombre, precio, 1); return; }
+
+    // Crear modal
+    let modal = document.getElementById('ingredientes-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'ingredientes-modal';
+        modal.className = 'ingredientes-modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    const checkboxes = data.ingredients.map(ing =>
+        `<label class="ing-check">
+            <input type="checkbox" value="${ing}" checked>
+            <span>${ing}</span>
+        </label>`
+    ).join('');
+
+    modal.innerHTML = `
+        <div class="ingredientes-modal-content" role="dialog" aria-modal="true" aria-labelledby="ing-modal-title">
+            <button class="ingredientes-modal-close" onclick="cerrarModalIngredientes()" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 id="ing-modal-title"><i class="fas fa-utensils"></i> ${nombre}</h3>
+            <p class="ing-modal-sub">Desmarque los ingredientes que no desea:</p>
+            <div class="ing-checks-grid">
+                ${checkboxes}
+            </div>
+            <div class="ing-modal-actions">
+                <button class="btn btn-primary ing-confirm-btn" onclick="confirmarIngredientes('${nombre}', ${precio})">
+                    <i class="fas fa-plus-circle"></i> Agregar al carrito
+                </button>
+                <button class="btn btn-secondary" onclick="cerrarModalIngredientes()">Cancelar</button>
+            </div>
+        </div>`;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalIngredientes() {
+    const modal = document.getElementById('ingredientes-modal');
+    if (modal) { modal.classList.remove('active'); document.body.style.overflow = ''; }
+}
+
+function confirmarIngredientes(nombre, precio) {
+    const modal = document.getElementById('ingredientes-modal');
+    const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
+    const todos = platillosData[nombre].ingredients;
+    const seleccionados = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+    const removidos = todos.filter(i => !seleccionados.includes(i));
+    cerrarModalIngredientes();
+    agregarAlCarrito(nombre, precio, 1, removidos, []);
+}
+
+// ==========================================
+// VIDEO MODAL
+// ==========================================
+function abrirVideo(nombre, url) {
+    const modal = document.getElementById('video-modal');
+    document.getElementById('video-title').textContent = nombre;
+    document.getElementById('video-frame').src = url + '?autoplay=1';
+    document.getElementById('video-description').textContent = platillosData[nombre]?.desc || '';
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    if (isReadAloud) hablar(`Video informativo de ${nombre}.`);
+}
+function cerrarVideo() {
+    const modal = document.getElementById('video-modal');
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.getElementById('video-frame').src = '';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (document.getElementById('video-modal').classList.contains('active')) cerrarVideo();
+        const ingModal = document.getElementById('ingredientes-modal');
+        if (ingModal && ingModal.classList.contains('active')) cerrarModalIngredientes();
+    }
+});
+
+// ==========================================
+// ACCESIBILIDAD — lector de pantalla con doble toque real
+// ==========================================
+// Estado del sistema de doble toque para el lector de página
+let readerPendingEl = null;
+let readerPendingTimeout = null;
+let readerPendingAction = null;
+
+function clearReaderPending() {
+    if (readerPendingTimeout) { clearTimeout(readerPendingTimeout); readerPendingTimeout = null; }
+    readerPendingEl = null;
+    readerPendingAction = null;
+}
+
+// Construir descripción hablada completa de un elemento tocado
+function describir(target) {
+    // Botón Agregar
+    const btnAgregar = target.closest('[data-action="agregar"]');
+    if (btnAgregar) {
+        const nombre = btnAgregar.dataset.nombre;
+        const precio = btnAgregar.dataset.precio;
+        return { texto: `Botón Agregar. ${nombre}. Precio: ${precioParaVoz(precio)}. Toque de nuevo para agregar a su orden.`, action: () => abrirModalIngredientes(nombre, parseFloat(precio)) };
+    }
+    // Botón Ver Video
+    const btnVideo = target.closest('.btn-video-toggle, [data-action="video"]');
+    if (btnVideo) {
+        const nombre = btnVideo.dataset.nombre || '';
+        return { texto: `Botón Ver Video. ${nombre}. Toque de nuevo para ver la descripción y video del platillo.`, action: null };
+    }
+    // Botón descargar orden
+    const btnDescargar = target.closest('[data-action="descargar"]');
+    if (btnDescargar) {
+        return { texto: `Botón Descargar Orden. Toque de nuevo para descargar su orden.`, action: () => descargarOrden() };
+    }
+    // Tarjeta completa (cuando se toca el fondo de la tarjeta, no un botón)
+    const card = target.closest('.card');
+    if (card && !target.closest('button')) {
+        const nombre = card.dataset.name;
+        const precio = card.dataset.price;
+        const desc = card.dataset.desc || '';
+        const platillo = platillosData[nombre];
+        let texto = `Platillo: ${nombre}. Precio: ${precioParaVoz(precio)}. `;
+        if (platillo) {
+            texto += platillo.desc + ' Ingredientes: ' + platillo.ingredients.join(', ') + '. ';
+        } else if (desc) {
+            texto += desc + '. ';
+        }
+        texto += 'Toque de nuevo para seleccionar este platillo.';
+        return { texto, action: null };
+    }
+    // Cualquier botón genérico
+    const btn = target.closest('button');
+    if (btn) {
+        const lbl = btn.getAttribute('aria-label') || btn.textContent.trim();
+        if (lbl) return { texto: `Botón: ${lbl}. Toque de nuevo para activar.`, action: () => btn.click() };
+    }
+    return null;
+}
+
+function leerElemento(e) {
+    const info = describir(e.target);
+    if (!info) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isSameEl = readerPendingEl && readerPendingEl === e.target.closest('button, .card, article');
+    if (isSameEl) {
+        // Segundo toque: confirmar y ejecutar
+        clearReaderPending();
+        hablar('Confirmado.');
+        if (readerPendingAction) setTimeout(() => readerPendingAction(), 300);
+    } else {
+        // Primer toque: leer descripción completa
+        clearReaderPending();
+        readerPendingEl = e.target.closest('button, .card, article') || e.target;
+        readerPendingAction = info.action;
+        speechSynth.cancel();
+        hablar(info.texto);
+        // Limpiar pending después de 8 segundos sin segundo toque
+        readerPendingTimeout = setTimeout(() => clearReaderPending(), 8000);
+    }
+}
+
+function toggleReadAloud() {
+    isReadAloud = !isReadAloud;
+    document.getElementById('btn-read').classList.toggle('active', isReadAloud);
+    clearReaderPending();
+    if (isReadAloud) {
+        hablar('Lector de pantalla activado. Toque cualquier elemento para escuchar su descripción. Toque dos veces para activarlo.');
+        document.addEventListener('click', leerElemento, true);
+    } else {
+        speechSynth.cancel();
+        document.removeEventListener('click', leerElemento, true);
+    }
+}
+
+// ==========================================
+// PANTALLA DE BIENVENIDA Y SELECCIÓN DE MODO
+// ==========================================
+let modoSeleccionRecognition = null;
+let micSeleccionActivo = true; // controla si el mic de selección está activo
+
+function iniciarMicSeleccion() {
+    if (!micSeleccionActivo) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    if (modoSeleccionRecognition) return;
+    const rec = new SpeechRecognition();
+    modoSeleccionRecognition = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+        const texto = e.results[0][0].transcript.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        modoSeleccionRecognition = null;
+        if (texto.includes('sin barrera') || texto.includes('uno') || texto.includes('1')) {
+            detenerMicSeleccion(); selectMode('default');
+        } else if (texto.includes('sordera') || texto.includes('hipoacusia') || texto.includes('dos') || texto.includes('2')) {
+            detenerMicSeleccion(); selectMode('deaf');
+        } else if (texto.includes('ceguera') || texto.includes('baja vision') || texto.includes('tres') || texto.includes('3')) {
+            detenerMicSeleccion(); selectMode('blind');
+        } else if (texto.includes('hablar') || texto.includes('barrera') || texto.includes('cuatro') || texto.includes('4')) {
+            detenerMicSeleccion(); selectMode('quiet');
+        } else if (texto.includes('silenciar') || texto.includes('detener') || texto.includes('parar')) {
+            micSeleccionActivo = false;
+            detenerMicSeleccion();
+        } else {
+            // No reconoció opción válida — reintentar
+            setTimeout(() => iniciarMicSeleccion(), 500);
+        }
+    };
+    rec.onerror = () => {
+        modoSeleccionRecognition = null;
+        if (micSeleccionActivo) setTimeout(() => iniciarMicSeleccion(), 1000);
+    };
+    rec.onend = () => {
+        if (modoSeleccionRecognition === rec) modoSeleccionRecognition = null;
+        // Reiniciar automáticamente si sigue activo y no se eligió nada
+        if (micSeleccionActivo && !modoSeleccionRecognition) {
+            setTimeout(() => iniciarMicSeleccion(), 600);
+        }
+    };
+    try { rec.start(); } catch(e) { modoSeleccionRecognition = null; }
+}
+
+function detenerMicSeleccion() {
+    micSeleccionActivo = false;
+    if (modoSeleccionRecognition) {
+        try { modoSeleccionRecognition.stop(); } catch(e) {}
+        modoSeleccionRecognition = null;
+    }
+}
+
+function mostrarPantallaSeleccion() {
+    micSeleccionActivo = true;
+    const welcomeEl = document.getElementById('welcome-overlay');
+    if (welcomeEl) {
+        welcomeEl.style.display = 'flex';
+        // Siempre hablar las opciones al mostrar pantalla de selección (persona puede ser ciega)
+        setTimeout(() => {
+            hablar(
+                "Bienvenido al menú digital accesible. " +
+                "Opción uno: Sin barrera de comunicación. " +
+                "Opción dos: Sordera o hipoacusia. " +
+                "Opción tres: Baja visión o ceguera. " +
+                "Opción cuatro: Barrera para hablar. " +
+                "Puede decirlo por voz o tocar el botón. " +
+                "Diga silenciar para detener el audio.",
+                () => {
+                    // Iniciar mic después de que termina de hablar
+                    if (micSeleccionActivo) iniciarMicSeleccion();
+                }
+            );
+        }, 400);
+    }
+}
+
+function speakWelcome() {
+    hablar(
+        "Bienvenido al menú digital accesible. " +
+        "Opción uno: Sin barrera de comunicación. " +
+        "Opción dos: Sordera o hipoacusia. " +
+        "Opción tres: Baja visión o ceguera. " +
+        "Opción cuatro: Barrera para hablar. " +
+        "Puede decirlo por voz o tocar el botón."
+    );
+}
+
+function hideOverlay(id) {
+    const el = document.getElementById(id);
+    if (el) { el.classList.add('hidden'); setTimeout(() => el.remove(), 500); }
+}
+
+function selectMode(mode) {
+    speechSynth.cancel();
+    detenerMicSeleccion();
+    if (mode === 'blind') {
+        closeWelcome();
+        // Mostrar overlay de elección ciego y hablar las opciones
+        const overlay = document.getElementById('blind-choice-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                hablar(
+                    "¿Cómo prefiere interactuar? " +
+                    "Opción uno: Lector de pantalla del dispositivo. Usa el TTS de su teléfono. " +
+                    "Opción dos: Chatbot IA por voz. El asistente de voz inteligente le atiende hablando. " +
+                    "Opción tres: Lector de voz de la página. Alto contraste y lector integrado activado automáticamente. " +
+                    "Diga uno, dos o tres, o toque el botón.",
+                    () => iniciarMicElegirCiego()
+                );
+            }, 200);
+        }
+        return;
+    }
+    aplicarModo(mode);
+    closeWelcome();
+}
+
+// Mic para elegir entre voice/reader en blind-choice-overlay
+let blindChoiceRec = null;
+function iniciarMicElegirCiego() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition || blindChoiceRec) return;
+    const rec = new SpeechRecognition();
+    blindChoiceRec = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+        blindChoiceRec = null;
+        const texto = e.results[0][0].transcript.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (texto.includes('uno') || texto.includes('1') || texto.includes('tts') || texto.includes('lector') || texto.includes('telefono') || texto.includes('dispositivo')) {
+            setBlindMode('tts');
+        } else if (texto.includes('dos') || texto.includes('2') || texto.includes('voz') || texto.includes('asistente') || texto.includes('chatbot') || texto.includes('ia')) {
+            setBlindMode('voice');
+        } else if (texto.includes('tres') || texto.includes('3') || texto.includes('contraste') || texto.includes('pantalla')) {
+            setBlindMode('reader');
+        } else {
+            setTimeout(() => iniciarMicElegirCiego(), 500);
+        }
+    };
+    rec.onerror = () => { blindChoiceRec = null; setTimeout(() => iniciarMicElegirCiego(), 1000); };
+    rec.onend = () => { if (blindChoiceRec === rec) blindChoiceRec = null; };
+    try { rec.start(); } catch(e) { blindChoiceRec = null; }
+}
+
+function setBlindMode(choice) {
+    if (blindChoiceRec) { try { blindChoiceRec.stop(); } catch(e) {} blindChoiceRec = null; }
+    hideOverlay('blind-choice-overlay');
+    aplicarModo('blind', choice);
+    sessionStorage.setItem('blindChoice', choice);
+}
+
+function aplicarModo(mode, blindChoice = null) {
+    sessionStorage.setItem('accessMode', mode);
+
+    // Por defecto, ocultar el chatbot en todos los modos excepto donde se necesita
+    const chatbotContainer = document.getElementById('chatbot-container');
+    if (chatbotContainer) chatbotContainer.style.display = 'none';
+
+    switch (mode) {
+        case 'deaf':
+            document.querySelectorAll('.btn-secondary').forEach(b => { b.style.borderColor = '#2563EB'; b.style.background = '#DBEAFE'; });
+            // Mostrar chatbot en modo sordo también (pueden escribir)
+            if (chatbotContainer) chatbotContainer.style.display = '';
+            break;
+        case 'blind':
+            if (!isHighContrast) toggleHighContrast();
+            document.documentElement.style.setProperty('--font-size-base', '20px');
+            if (blindChoice === 'voice') {
+                isReadAloud = true;
+                voiceAssistantEnabled = true;
+                document.getElementById('btn-read').classList.add('active');
+                document.addEventListener('click', leerElemento, true);
+                activarModoCiego();
+                document.body.classList.add('blind-voice-simplified');
+                // Solo en este modo aparece la burbuja de voz
+                document.getElementById('blind-bubble').classList.remove('hidden');
+                // Chatbot visible pero sin botón toggle (la burbuja lo controla)
+                if (chatbotContainer) chatbotContainer.style.display = '';
+                const mensajes = document.getElementById('chatbot-messages');
+                mensajes.innerHTML = '';
+                addMessage("¡Hola! Soy su asistente de pedido. Diga el nombre de un platillo para pedirlo, pregunte ingredientes, o diga «ver mi orden» o «pagar». ¡Toque la burbuja cuando quiera hablar!", 'bot');
+
+                const savedOrden = sessionStorage.getItem('ordenGuardada');
+                if (savedOrden) {
+                    try {
+                        const parsed = JSON.parse(savedOrden);
+                        if (parsed.items && parsed.items.length > 0) {
+                            orden = parsed.items;
+                            total = parsed.total;
+                            document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
+                            renderizarOrden();
+                            let resumen = "Bienvenido de nuevo. Su orden anterior tiene: ";
+                            parsed.items.forEach(i => resumen += `${i.cantidad} ${i.nombre}, `);
+                            resumen += `Total: ${precioParaVoz(total)}. ¿Desea continuar o hacer cambios?`;
+                            setTimeout(() => {
+                                actualizarBurbujaEstado('speaking', 'Escúchame...');
+                                hablar(resumen, () => {
+                                    actualizarBurbujaEstado('idle', 'Toca para hablar');
+                                    setTimeout(() => activarVozCiego(), 600);
+                                });
+                            }, 500);
+                            return;
+                        }
+                    } catch(e) {}
+                }
+
+                const mensajeBienvenida = "Hola, bienvenido. Soy su asistente de voz. Puedo ayudarle a pedir platillos, consultar ingredientes, personalizar su orden y enviarla al personal. Por ejemplo, puede decir: quiero dos tacos al pastor, o, ¿qué ingredientes tiene la hamburguesa? Toque la burbuja cuando quiera hablar. ¿Qué desea ordenar hoy?";
+                setTimeout(() => {
+                    actualizarBurbujaEstado('speaking', 'Escúchame...');
+                    hablar(mensajeBienvenida, () => {
+                        actualizarBurbujaEstado('idle', 'Toca para hablar');
+                        setTimeout(() => activarVozCiego(), 600);
+                    });
+                }, 500);
+            } else if (blindChoice === 'tts') {
+                // Modo TTS del dispositivo: interfaz visual normal con ARIA enriquecido
+                // La burbuja de voz NO aparece - el TTS del teléfono (VoiceOver/TalkBack) lo hace
+                document.getElementById('blind-bubble').classList.add('hidden');
+                document.body.classList.add('blind-tts-mode');
+                isReadAloud = false; // No usamos el TTS interno de la página
+                voiceAssistantEnabled = false;
+                // Chatbot oculto en este modo
+                if (chatbotContainer) chatbotContainer.style.display = 'none';
+                // Aplicar ARIA live region y focus en el título del menú
+                setTimeout(() => {
+                    const titulo = document.querySelector('.section-title');
+                    if (titulo) titulo.focus();
+                }, 300);
+            } else {
+                // reader: TTS de la página activado automáticamente (no chatbot, no burbuja)
+                isReadAloud = true;
+                voiceAssistantEnabled = true;
+                document.getElementById('btn-read').classList.add('active');
+                document.addEventListener('click', leerElemento, true);
+                document.getElementById('blind-bubble').classList.add('hidden');
+                // Anunciar activación por voz de la página
+                setTimeout(() => {
+                    hablar(
+                        "Lector de voz de la página activado. Puede navegar el menú y escuchar las descripciones de cada platillo. " +
+                        "Toque cualquier tarjeta para escuchar el platillo. " +
+                        "Toque el botón Agregar para añadirlo a su orden."
+                    );
+                }, 300);
+            }
+            break;
+        case 'quiet':
+            closeWelcome();
+            document.getElementById('blind-bubble').classList.add('hidden');
+            // En modo silencio sí se muestra el chatbot
+            if (chatbotContainer) chatbotContainer.style.display = '';
+            setTimeout(() => { toggleChatbot(); setTimeout(() => document.getElementById('chatbot-input').focus(), 150); }, 300);
+            break;
+        default:
+            // Modo default: burbuja no aparece, chatbot disponible
+            document.getElementById('blind-bubble').classList.add('hidden');
+            if (chatbotContainer) chatbotContainer.style.display = '';
+            break;
+    }
+}
+
+function activarModoCiego() {
+    isBlindMode = true;
+    document.body.classList.add('blind-mode');
+}
+
+// ==========================================
+// CONTROL DE BURBUJA MODO CIEGO
+// ==========================================
+function actualizarBurbujaEstado(estado, textoStatus) {
+    const circle = document.getElementById('bubble-circle');
+    const status = document.getElementById('bubble-status');
+    const glyph  = document.getElementById('bubble-icon-glyph');
+    if (!circle) return;
+    circle.classList.remove('speaking', 'listening', 'idle');
+    circle.classList.add(estado);
+    if (status) status.textContent = textoStatus || '';
+    if (glyph) {
+        glyph.className = estado === 'speaking' ? 'fas fa-volume-high' : 'fas fa-microphone';
+    }
+}
+
+// Versión especial de activarVoz para modo ciego
+function activarVozCiego() {
+    if (!isBlindMode) { activarVoz(); return; }
+    if (!voiceAssistantEnabled) {
+        actualizarBurbujaEstado('idle', 'Asistente silenciado');
+        return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        actualizarBurbujaEstado('idle', 'Voz no disponible');
+        hablar('Su navegador no soporta reconocimiento de voz. Por favor escriba su pedido.');
+        return;
+    }
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+        actualizarBurbujaEstado('idle', 'Toca para hablar');
+        return;
+    }
+    speechSynth.cancel();
+    const recognition = new SpeechRecognition();
+    recognitionInstance = recognition;
+    recognition.lang = 'es-MX';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    actualizarBurbujaEstado('listening', 'Escuchando...');
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        recognitionInstance = null;
+        actualizarBurbujaEstado('speaking', 'Procesando...');
+        document.getElementById('chatbot-input').value = transcript;
+        addMessage(transcript, 'user');
+        const respuesta = processBotMessageLocal(transcript);
+        setTimeout(() => {
+            addMessage(respuesta, 'bot');
+            actualizarBurbujaEstado('speaking', 'Respondiendo...');
+            hablar(respuesta, () => {
+                if (voiceAssistantEnabled) {
+                    actualizarBurbujaEstado('idle', 'Toca para hablar');
+                    setTimeout(() => activarVozCiego(), 800);
+                } else {
+                    actualizarBurbujaEstado('idle', 'Asistente silenciado');
+                }
+            });
+        }, 400);
+    };
+    recognition.onerror = (event) => {
+        console.error('Mic error:', event.error);
+        recognitionInstance = null;
+        if (voiceAssistantEnabled) {
+            actualizarBurbujaEstado('idle', 'Toca para hablar');
+        }
+    };
+    recognition.onend = () => {
+        if (recognitionInstance === recognition) {
+            recognitionInstance = null;
+            if (voiceAssistantEnabled) actualizarBurbujaEstado('idle', 'Toca para hablar');
+        }
+    };
+    setTimeout(() => {
+        try { recognition.start(); } catch(err) {
+            recognitionInstance = null;
+            actualizarBurbujaEstado('idle', 'Toca para hablar');
+        }
+    }, 100);
+}
+
+function closeWelcome() { hideOverlay('welcome-overlay'); }
+
+// ==========================================
+// DESACTIVAR / REACTIVAR ASISTENTE DE VOZ
+// ==========================================
+function desactivarTTS() {
+    speechSynth.cancel();
+    voiceAssistantEnabled = false;
+    isReadAloud = false;
+    document.getElementById('btn-read').classList.remove('active');
+    document.removeEventListener('click', leerElemento);
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+    }
+    const micBtn = document.getElementById('mic-btn');
+    if (micBtn) micBtn.classList.remove('listening');
+    if (isBlindMode) actualizarBurbujaEstado('idle', 'Asistente silenciado');
+}
+
+// ==========================================
+// CHATBOT
+// ==========================================
+function toggleChatbot() {
+    const win = document.getElementById('chatbot-window');
+    const btn = document.querySelector('.chatbot-toggle');
+    win.classList.toggle('active');
+    btn.setAttribute('aria-expanded', win.classList.contains('active'));
+    if (win.classList.contains('active')) setTimeout(() => document.getElementById('chatbot-input').focus(), 100);
+}
+function sendMessage() {
+    const input = document.getElementById('chatbot-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    addMessage(msg, 'user');
+    input.value = '';
+    const respuesta = processBotMessageLocal(msg);
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
+}
+const numerosTexto = { 'un':1, 'uno':1, 'una':1, 'dos':2, 'tres':3, 'cuatro':4, 'cinco':5, 'seis':6, 'siete':7, 'ocho':8, 'nueve':9, 'diez':10, 'media docena':6, 'docena':12 };
+function extraerCantidad(texto) {
+    const matchNum = texto.match(/\b(\d+)\b/);
+    if (matchNum) return parseInt(matchNum[0]);
+    for (let p in numerosTexto) if (texto.includes(p)) return numerosTexto[p];
+    return 1;
+}
+
+// Aliases y palabras clave alternativas para detectar platillos por nombre parcial o coloquial
+const platilloAliases = {
+    'Tacos al Pastor': ['taco', 'tacos', 'pastor', 'taquito', 'taquitos', 'taco pastor', 'tacos pastor', 'al pastor'],
+    'Hamburguesa Clásica': ['hamburguesa', 'hamburguesas', 'burger', 'burguesa', 'hamburgesa', 'hamburger', 'clasica', 'clásica'],
+    'Pizza Margarita': ['pizza', 'pizzas', 'margarita', 'margherita', 'margaritas', 'piza'],
+    'Sushi Roll California': ['sushi', 'sushis', 'roll', 'rolls', 'california', 'cangrejo', 'maki', 'makis', 'rollo', 'rollos', 'roll california', 'sushi california', 'sushi roll'],
+    'Ensalada César': ['ensalada', 'ensaladas', 'cesar', 'césar', 'ensalada cesar', 'ensalada verde'],
+    'Pasta Carbonara': ['pasta', 'pastas', 'carbonara', 'espagueti', 'spaghetti', 'spagueti', 'carbonara pasta'],
+    'Pollo Teriyaki': ['pollo', 'pollos', 'teriyaki', 'pollo teriyaki', 'teriyaky', 'pollo asian'],
+    'Filete de Salmón': ['salmon', 'salmón', 'filete', 'filete salmon', 'filete de salmon', 'pescado']
+};
+
+// Encontrar platillo por nombre exacto o alias en el texto
+function encontrarPlatillo(msg) {
+    // Primero búsqueda exacta por nombre completo
+    for (let nombre in platillosData) {
+        if (msg.includes(nombre.toLowerCase())) return nombre;
+    }
+    // Luego búsqueda por aliases
+    for (let nombre in platilloAliases) {
+        const aliases = platilloAliases[nombre];
+        for (let alias of aliases) {
+            if (msg.includes(alias)) return nombre;
+        }
+    }
+    return null;
+}
+
+function processBotMessageLocal(message) {
+    const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // Silenciar / activar asistente
+    if (msg.match(/silenciar|desactivar asistente|silencio|para|detente|stop/)) {
+        desactivarTTS();
+        if (recognitionInstance) { try { recognitionInstance.stop(); } catch(e) {} recognitionInstance = null; }
+        return "Asistente de voz silenciado.";
+    }
+
+    // Saludos
+    if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches|hi|hello/)) {
+        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes o decirte el menú completo.";
+    }
+    // Menú completo
+    if (msg.match(/menu|platillos|comida|que tiene|opciones|que hay|que sirven|que ofrecen|carta/)) {
+        let menuTxt = "Platillos disponibles: ";
+        for (let nombre in platillosData) menuTxt += `${nombre} a ${precioParaVoz(platillosData[nombre].price)}, `;
+        return menuTxt.replace(/, $/, '') + ". Puedes pedir uno o varios con cantidad, ej. 'dos tacos' o 'tres pizzas'.";
+    }
+    // Ingredientes de un platillo específico
+    if (msg.match(/ingredientes|que contiene|que lleva|tiene|componentes|alergen/)) {
+        const platillo = encontrarPlatillo(msg);
+        if (platillo) {
+            return `${platillo} lleva: ${platillosData[platillo].ingredients.join(', ')}. ¿Deseas quitar o agregar algún ingrediente?`;
+        }
+        return "Dime de qué platillo quieres saber los ingredientes. Por ejemplo: '¿qué ingredientes tiene el sushi?'";
+    }
+    // Modificar ingrediente — quitar
+    const modQuitar = msg.match(/(quitar|sin|eliminar|no quiero|no le pongas|omitir|remove)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(de|del|en|al)\s+(.+))?$/);
+    if (modQuitar) return modificarIngrediente((modQuitar[3] || '').trim(), 'quitar', modQuitar[5]?.trim());
+    // Modificar ingrediente — agregar
+    const modAgregar = msg.match(/(agregar|añadir|poner|con extra|extra|adicional|add)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(a|en|al|sobre)\s+(.+))?$/);
+    if (modAgregar) return modificarIngrediente((modAgregar[3] || '').trim(), 'agregar', modAgregar[5]?.trim());
+
+    // Pedido con cantidad — detectar intención de ordenar + platillo
+    // Patrones: "quiero X tacos", "dame X sushi", "ponme X pizza", "pide X hamburguesa", "agrega X pollo", etc.
+    const intencionPedir = msg.match(/(quiero|quisiera|dame|ponme|pedir|pide|agrega|agregar|añade|ordenar|orden|trae|traeme|deseo|necesito|deme|ponle|va|van)/);
+    const platilloDetectado = encontrarPlatillo(msg);
+    if (platilloDetectado) {
+        const cantidad = extraerCantidad(msg);
+        agregarAlCarrito(platilloDetectado, platillosData[platilloDetectado].price, cantidad);
+        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
+        const precioVoz = precioParaVoz(platillosData[platilloDetectado].price * cantidad);
+        return `He añadido ${cantidad} ${platilloDetectado} a tu orden. Total de ese artículo: ${precioVoz}. ¿Algo más?`;
+    }
+    // Resumen / cuenta / total
+    if (msg.match(/total|cuenta|resumen|orden|que llevo|cuanto es|cuanto debo|cuanto seria|pedido|mi orden/)) {
+        if (orden.length === 0) return "Tu orden está vacía. Puedes pedir algo diciendo el nombre del platillo.";
+        let resumen = "Tu orden tiene: ";
+        orden.forEach(i => resumen += `${i.cantidad} ${i.nombre} a ${precioParaVoz(i.precio * i.cantidad)}. `);
+        resumen += `El total es ${precioParaVoz(total)}.`;
+        return resumen;
+    }
+    // Eliminar un platillo de la orden
+    if (msg.match(/eliminar|quitar de la orden|borrar|remover|cancel/)) {
+        const platilloEliminar = encontrarPlatillo(msg);
+        if (platilloEliminar) {
+            const idx = orden.findIndex(i => i.nombre === platilloEliminar);
+            if (idx !== -1) {
+                eliminarDelCarrito(orden[idx].id);
+                return `He eliminado ${platilloEliminar} de tu orden.`;
+            }
+            return `No tienes ${platilloEliminar} en tu orden.`;
+        }
+    }
+    // Pagar / enviar / finalizar
+    if (msg.match(/enviar|descargar|pagar|finalizar|listo|cobrar|terminar|ya es todo|eso es todo|confirmar|confirma/)) {
+        if (orden.length === 0) return "No hay nada que enviar. ¿Qué deseas ordenar?";
+        let resumen = "Finalizando su orden. Tiene: ";
+        orden.forEach(i => resumen += `${i.cantidad} ${i.nombre}. `);
+        resumen += `Total a pagar: ${precioParaVoz(total)}. Descargando archivo para mostrar al personal.`;
+        setTimeout(() => descargarOrden(), 1200);
+        return resumen;
+    }
+    // Precio de un platillo
+    if (msg.match(/cuanto cuesta|precio|cuanto vale|cuanto es el|cuanto son/)) {
+        const platilloPrecio = encontrarPlatillo(msg);
+        if (platilloPrecio) return `${platilloPrecio} cuesta ${precioParaVoz(platillosData[platilloPrecio].price)}.`;
+        return "Dime de qué platillo quieres saber el precio. Por ejemplo: '¿cuánto cuesta el salmón?'";
+    }
+    // Descripción de un platillo
+    if (msg.match(/describe|descripcion|como es|que es|cuéntame|cuentame|informacion/)) {
+        const platilloDesc = encontrarPlatillo(msg);
+        if (platilloDesc) return `${platilloDesc}: ${platillosData[platilloDesc].desc}`;
+        return "Dime de qué platillo quieres la descripción.";
+    }
+    // Ayuda
+    if (msg.match(/ayuda|que puedo hacer|como funciona|ayudame|commands|comandos/)) {
+        return "Puedes decir: 'quiero 2 tacos', 'dame una pizza', 'ingredientes del sushi', 'sin queso la hamburguesa', 'cuánto es el total', o 'ya es todo' para finalizar tu orden.";
+    }
+    // Respuesta por defecto
+    return "No entendí bien. Puedes pedir algo como '2 tacos al pastor', 'una pizza', 'qué ingredientes tiene el sushi', o di 'menú' para escuchar todas las opciones.";
+}
+function modificarIngrediente(ingrediente, accion, platilloRef) {
+    let item = null;
+    if (platilloRef) {
+        for (let p in platillosData) if (p.toLowerCase().includes(platilloRef)) { item = orden.find(i => i.nombre === p); break; }
+    } else item = orden[orden.length-1];
+    if (!item) return "No encuentro ese platillo en tu orden.";
+    if (!item.custom) item.custom = { removed: [], added: [] };
+    if (accion === 'quitar') {
+        if (!item.custom.removed.includes(ingrediente)) item.custom.removed.push(ingrediente);
+        item.custom.added = item.custom.added.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He quitado "${ingrediente}" de ${item.nombre}.`;
+    } else {
+        if (!item.custom.added.includes(ingrediente)) item.custom.added.push(ingrediente);
+        item.custom.removed = item.custom.removed.filter(i => i !== ingrediente);
+        renderizarOrden();
+        return `He añadido "${ingrediente}" a ${item.nombre}.`;
+    }
+}
+function addMessage(text, sender) {
+    const cont = document.getElementById('chatbot-messages');
+    const div = document.createElement('div');
+    div.className = `message ${sender}-message`;
+    div.innerHTML = `<div class="message-content"><p>${text}</p><span class="message-time">${new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</span></div>`;
+    cont.appendChild(div);
+    cont.scrollTop = cont.scrollHeight;
+}
+function scrollChatToBottom() {
+    const c = document.getElementById('chatbot-messages');
+    if (c) c.scrollTop = c.scrollHeight;
+}
+function handleChatKeypress(event) { if (event.key === 'Enter') sendMessage(); }
+
+// ==========================================
+// RECONOCIMIENTO DE VOZ (chatbot normal)
+// ==========================================
+let recognitionInstance = null;
+function activarVoz() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('mic-btn');
+    if (!SpeechRecognition) { addMessage('Navegador no soporta reconocimiento de voz.', 'bot'); return; }
+    if (recognitionInstance) {
+        try { recognitionInstance.stop(); } catch(e) {}
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        return;
+    }
+    const chatWindow = document.getElementById('chatbot-window');
+    if (!chatWindow.classList.contains('active')) toggleChatbot();
+    speechSynth.cancel();
+    const recognition = new SpeechRecognition();
+    recognitionInstance = recognition;
+    recognition.lang = 'es-MX';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    micBtn.classList.add('listening');
+    micBtn.setAttribute('aria-label', 'Escuchando... toque para detener');
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        document.getElementById('chatbot-input').value = transcript;
+        enviarMensajeDirecto(transcript);
+    };
+    recognition.onerror = (event) => {
+        recognitionInstance = null;
+        micBtn.classList.remove('listening');
+        micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        addMessage('Error con el micrófono. Puedes escribir tu mensaje.', 'bot');
+    };
+    recognition.onend = () => {
+        if (recognitionInstance === recognition) {
+            recognitionInstance = null;
+            micBtn.classList.remove('listening');
+            micBtn.setAttribute('aria-label', 'Activar micrófono para dictado de voz');
+        }
+    };
+    setTimeout(() => {
+        try { recognition.start(); } catch (err) {
+            recognitionInstance = null;
+            micBtn.classList.remove('listening');
+        }
+    }, 150);
+}
+function enviarMensajeDirecto(texto) {
+    if (!texto.trim()) return;
+    document.getElementById('chatbot-input').value = '';
+    addMessage(texto, 'user');
+    const respuesta = processBotMessageLocal(texto);
+    setTimeout(() => {
+        addMessage(respuesta, 'bot');
+        if (isReadAloud) hablar(respuesta);
+    }, 600);
+}
+
+// ==========================================
+// UTILIDADES DE ACCESIBILIDAD
+// ==========================================
+function toggleAccessPanel() {
+    document.getElementById('panel-content').classList.toggle('active');
+    document.querySelector('.toggle-panel').setAttribute('aria-expanded', document.getElementById('panel-content').classList.contains('active'));
+}
+function changeFontSize(delta) {
+    const curr = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base')) || 16;
+    let size = delta === 0 ? 16 : Math.max(12, Math.min(24, curr + delta));
+    document.documentElement.style.setProperty('--font-size-base', size + 'px');
+    if (isReadAloud) hablar(`Tamaño de texto: ${size} puntos.`);
+}
+function toggleHighContrast() {
+    isHighContrast = !isHighContrast;
+    document.body.classList.toggle('high-contrast', isHighContrast);
+    document.getElementById('btn-contrast').classList.toggle('active', isHighContrast);
+    if (isReadAloud) hablar(isHighContrast ? 'Alto contraste activado.' : 'Alto contraste desactivado.');
+}
+
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.card').forEach((card, i) => {
+        card.style.opacity = '0'; card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            card.style.opacity = '1'; card.style.transform = 'translateY(0)';
+        }, i * 80);
+    });
+
+    // Asegurar que la burbuja siempre esté oculta al inicio
+    const bubble = document.getElementById('blind-bubble');
+    if (bubble) bubble.classList.add('hidden');
+
+    // Ocultar chatbot por defecto hasta que se elija el modo adecuado
+    const chatbotContainer = document.getElementById('chatbot-container');
+    if (chatbotContainer) chatbotContainer.style.display = 'none';
+
+    // ── MANEJO INLINE DEL BOTÓN "VER VIDEO" ──────────────────────────────
+    // Interceptar clicks en .btn-video-toggle para mostrar descripción debajo de la tarjeta
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-video-toggle');
+        if (!btn) return;
+
+        // Si es modo ciego-voz, dejar que el sistema de blindTap lo maneje
+        if (isBlindMode && document.body.classList.contains('blind-voice-simplified')) return;
+
+        e.stopPropagation();
+        const card = btn.closest('.card');
+        if (!card) return;
+
+        const descPanel = card.querySelector('.card-video-desc');
+        const nombre = btn.dataset.nombre;
+        const isOpen = btn.getAttribute('aria-expanded') === 'true';
+
+        if (isOpen) {
+            // Cerrar descripción inline
+            btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = '<i class="fas fa-play-circle"></i> Ver Video';
+            if (descPanel) {
+                descPanel.hidden = true;
+                descPanel.innerHTML = '';
+            }
+        } else {
+            // Abrir descripción inline
+            btn.setAttribute('aria-expanded', 'true');
+            btn.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
+            const data = platillosData[nombre];
+            if (descPanel && data) {
+                const ingredsList = data.ingredients.map(i => `<li>${i}</li>`).join('');
+                descPanel.innerHTML = `
+                    <div class="video-desc-inner">
+                        <p class="video-desc-text">${data.desc}</p>
+                        <details class="video-desc-ingredients">
+                            <summary><i class="fas fa-list-ul"></i> Ingredientes</summary>
+                            <ul>${ingredsList}</ul>
+                        </details>
+                        <button class="btn-open-video-modal" onclick="abrirVideo('${nombre}', '${btn.dataset.url}')">
+                            <i class="fas fa-play"></i> Ver video completo
+                        </button>
+                    </div>`;
+                descPanel.hidden = false;
+                // Si es modo TTS, leer descripción para el lector de pantalla del dispositivo
+                if (document.body.classList.contains('blind-tts-mode')) {
+                    descPanel.setAttribute('tabindex', '-1');
+                    setTimeout(() => descPanel.focus(), 100);
+                }
+            }
+        }
+    }, true); // capture para que corra antes del delegado global
+
+    // sessionStorage: persiste en recarga, no en cierre de pestaña
+    const savedMode = sessionStorage.getItem('accessMode');
+    const savedBlindChoice = sessionStorage.getItem('blindChoice');
+
+    if (savedMode) {
+        if (savedMode === 'blind' && savedBlindChoice) {
+            aplicarModo('blind', savedBlindChoice);
+        } else {
+            aplicarModo(savedMode);
+        }
+    } else {
+        setTimeout(() => mostrarPantallaSeleccion(), 400);
+    }
+});
