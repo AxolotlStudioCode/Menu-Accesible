@@ -121,13 +121,13 @@ function clearPendingAction() {
 // ==========================================
 // CARRITO DE COMPRAS
 // ==========================================
-function agregarAlCarrito(nombre, precio, cantidad = 1, removidos = [], agregados = []) {
+function agregarAlCarrito(nombre, precio, cantidad = 1, removidos = [], agregados = [], silencioso = false) {
     if (cantidad <= 0) return;
     orden.push({ nombre, precio, cantidad, id: Date.now(), custom: { removed: removidos, added: agregados } });
     total += precio * cantidad;
     document.getElementById('total-precio').innerText = '$' + total.toFixed(2);
     renderizarOrden();
-    if (isReadAloud) hablar(`${nombre} agregado a su orden.`);
+    if (isReadAloud && !silencioso) hablar(`${nombre} agregado a su orden.`);
 }
 function eliminarDelCarrito(id) {
     const idx = orden.findIndex(i => i.id === id);
@@ -272,84 +272,151 @@ document.addEventListener('keydown', (e) => {
 // ==========================================
 // ACCESIBILIDAD — lector de pantalla con doble toque real
 // ==========================================
-// Estado del sistema de doble toque para el lector de página
-let readerPendingEl = null;
+// El sistema usa un ID único por elemento para detectar "mismo elemento tocado dos veces"
+// independientemente de dónde exactamente toca el dedo dentro del elemento.
+
+let readerPendingKey = null;   // string identificador del elemento pendiente
 let readerPendingTimeout = null;
 let readerPendingAction = null;
 
 function clearReaderPending() {
     if (readerPendingTimeout) { clearTimeout(readerPendingTimeout); readerPendingTimeout = null; }
-    readerPendingEl = null;
+    readerPendingKey = null;
     readerPendingAction = null;
 }
 
-// Construir descripción hablada completa de un elemento tocado
+// Obtener una clave estable para identificar el elemento tocado
+function getElementKey(target) {
+    // Botón con data-action tiene nombre único
+    const btnAction = target.closest('[data-action]');
+    if (btnAction) {
+        return (btnAction.dataset.action || '') + '::' + (btnAction.dataset.nombre || btnAction.dataset.action);
+    }
+    // Tarjeta de platillo
+    const card = target.closest('.card[data-name]');
+    if (card) return 'card::' + card.dataset.name;
+    // Botón genérico: usar aria-label o texto
+    const btn = target.closest('button');
+    if (btn) return 'btn::' + (btn.getAttribute('aria-label') || btn.textContent.trim()).slice(0, 40);
+    return null;
+}
+
+// Construir la info (texto a leer + acción a ejecutar en segundo toque) según el elemento
 function describir(target) {
-    // Botón Agregar
+    // ── Botón AGREGAR ──────────────────────────────────────────────────────
     const btnAgregar = target.closest('[data-action="agregar"]');
     if (btnAgregar) {
         const nombre = btnAgregar.dataset.nombre;
         const precio = btnAgregar.dataset.precio;
-        return { texto: `Botón Agregar. ${nombre}. Precio: ${precioParaVoz(precio)}. Toque de nuevo para agregar a su orden.`, action: () => abrirModalIngredientes(nombre, parseFloat(precio)) };
+        const platillo = platillosData[nombre];
+        // Ingredientes breves para que sepa qué va a pedir
+        const ings = platillo ? platillo.ingredients.slice(0, 4).join(', ') : '';
+        const textoIngs = ings ? ` Lleva: ${ings}.` : '';
+        return {
+            texto: `Agregar ${nombre}. ${precioParaVoz(precio)}.${textoIngs} Toque de nuevo para agregar a su orden.`,
+            // Agregar directo en modo reader, sin modal visual
+            action: () => {
+                agregarAlCarrito(nombre, parseFloat(precio), 1, [], [], true);
+                hablar(`${nombre} agregado a su orden. Total: ${precioParaVoz(total)}.`);
+            }
+        };
     }
-    // Botón Ver Video
+
+    // ── Botón VER VIDEO ────────────────────────────────────────────────────
     const btnVideo = target.closest('.btn-video-toggle, [data-action="video"]');
     if (btnVideo) {
         const nombre = btnVideo.dataset.nombre || '';
-        return { texto: `Botón Ver Video. ${nombre}. Toque de nuevo para ver la descripción y video del platillo.`, action: null };
+        const url = btnVideo.dataset.url || '';
+        const platillo = platillosData[nombre];
+        // Descripción corta (la de la tarjeta, no el párrafo largo)
+        const card = btnVideo.closest('.card');
+        const descCorta = card ? (card.querySelector('.card-description')?.textContent?.trim() || '') : '';
+        const ings = platillo ? 'Ingredientes: ' + platillo.ingredients.join(', ') + '.' : '';
+        return {
+            texto: `Ver video de ${nombre}. ${descCorta} ${ings} Toque de nuevo para abrir el video.`,
+            action: () => abrirVideo(nombre, url)
+        };
     }
-    // Botón descargar orden
+
+    // ── Botón DESCARGAR ORDEN ──────────────────────────────────────────────
     const btnDescargar = target.closest('[data-action="descargar"]');
     if (btnDescargar) {
-        return { texto: `Botón Descargar Orden. Toque de nuevo para descargar su orden.`, action: () => descargarOrden() };
+        return {
+            texto: `Descargar orden. Toque de nuevo para guardar su orden como archivo.`,
+            action: () => descargarOrden()
+        };
     }
-    // Tarjeta completa (cuando se toca el fondo de la tarjeta, no un botón)
+
+    // ── TARJETA (zona fuera de botones) ────────────────────────────────────
     const card = target.closest('.card');
     if (card && !target.closest('button')) {
         const nombre = card.dataset.name;
         const precio = card.dataset.price;
-        const desc = card.dataset.desc || '';
+        // Usar la descripción corta que ya existe en la tarjeta, NO el párrafo largo
+        const descCorta = card.querySelector('.card-description')?.textContent?.trim() || '';
         const platillo = platillosData[nombre];
-        let texto = `Platillo: ${nombre}. Precio: ${precioParaVoz(precio)}. `;
-        if (platillo) {
-            texto += platillo.desc + ' Ingredientes: ' + platillo.ingredients.join(', ') + '. ';
-        } else if (desc) {
-            texto += desc + '. ';
-        }
-        texto += 'Toque de nuevo para seleccionar este platillo.';
-        return { texto, action: null };
+        const ings = platillo ? platillo.ingredients.slice(0, 5).join(', ') : '';
+        const textoIngs = ings ? ` Ingredientes principales: ${ings}.` : '';
+        // Alérgenos
+        const badges = Array.from(card.querySelectorAll('.badge')).map(b => b.textContent.trim()).join(', ');
+        const textoAlerg = badges ? ` Contiene: ${badges}.` : '';
+        return {
+            texto: `${nombre}. ${precioParaVoz(precio)}. ${descCorta}${textoIngs}${textoAlerg} Toque de nuevo para explorar opciones.`,
+            action: null  // segundo toque en la tarjeta genérica no hace nada especial
+        };
     }
-    // Cualquier botón genérico
+
+    // ── BOTÓN GENÉRICO ─────────────────────────────────────────────────────
     const btn = target.closest('button');
     if (btn) {
         const lbl = btn.getAttribute('aria-label') || btn.textContent.trim();
-        if (lbl) return { texto: `Botón: ${lbl}. Toque de nuevo para activar.`, action: () => btn.click() };
+        if (!lbl) return null;
+        // Capturar referencia estable antes del setTimeout
+        const btnRef = btn;
+        return {
+            texto: `${lbl}. Toque de nuevo para activar.`,
+            action: () => {
+                // Disparar click nativo sin pasar por el listener del reader
+                isReadAloud = false;
+                btnRef.click();
+                isReadAloud = true;
+            }
+        };
     }
+
     return null;
 }
 
 function leerElemento(e) {
-    const info = describir(e.target);
-    if (!info) return;
+    // Ignorar clicks que vienen de dentro del panel de accesibilidad
+    if (e.target.closest('.accessibility-panel') || e.target.closest('.panel-content')) return;
+
+    const key = getElementKey(e.target);
+    if (!key) return;
 
     e.preventDefault();
     e.stopPropagation();
 
-    const isSameEl = readerPendingEl && readerPendingEl === e.target.closest('button, .card, article');
-    if (isSameEl) {
-        // Segundo toque: confirmar y ejecutar
+    if (readerPendingKey && readerPendingKey === key) {
+        // ── SEGUNDO TOQUE: ejecutar acción ─────────────────────────────
+        const actionToRun = readerPendingAction;
         clearReaderPending();
-        hablar('Confirmado.');
-        if (readerPendingAction) setTimeout(() => readerPendingAction(), 300);
+        speechSynth.cancel();
+        if (actionToRun) {
+            hablar('Confirmado.');
+            setTimeout(() => actionToRun(), 400);
+        }
     } else {
-        // Primer toque: leer descripción completa
+        // ── PRIMER TOQUE: leer descripción ─────────────────────────────
+        const info = describir(e.target);
+        if (!info) return;
         clearReaderPending();
-        readerPendingEl = e.target.closest('button, .card, article') || e.target;
+        readerPendingKey = key;
         readerPendingAction = info.action;
         speechSynth.cancel();
         hablar(info.texto);
-        // Limpiar pending después de 8 segundos sin segundo toque
-        readerPendingTimeout = setTimeout(() => clearReaderPending(), 8000);
+        // Limpiar pending después de 10 s sin segundo toque
+        readerPendingTimeout = setTimeout(() => clearReaderPending(), 10000);
     }
 }
 
@@ -358,7 +425,7 @@ function toggleReadAloud() {
     document.getElementById('btn-read').classList.toggle('active', isReadAloud);
     clearReaderPending();
     if (isReadAloud) {
-        hablar('Lector de pantalla activado. Toque cualquier elemento para escuchar su descripción. Toque dos veces para activarlo.');
+        hablar('Lector de pantalla activado. Toque una vez para escuchar. Toque dos veces para confirmar.');
         document.addEventListener('click', leerElemento, true);
     } else {
         speechSynth.cancel();
@@ -609,12 +676,12 @@ function aplicarModo(mode, blindChoice = null) {
                 document.getElementById('btn-read').classList.add('active');
                 document.addEventListener('click', leerElemento, true);
                 document.getElementById('blind-bubble').classList.add('hidden');
-                // Anunciar activación por voz de la página
+                // Anunciar activación
                 setTimeout(() => {
                     hablar(
-                        "Lector de voz de la página activado. Puede navegar el menú y escuchar las descripciones de cada platillo. " +
-                        "Toque cualquier tarjeta para escuchar el platillo. " +
-                        "Toque el botón Agregar para añadirlo a su orden."
+                        "Lector de pantalla activado. Toque una vez cualquier elemento para escuchar su descripción. " +
+                        "Toque dos veces el mismo elemento para confirmar la acción. " +
+                        "Por ejemplo: toque Agregar una vez para escuchar el platillo, y toque Agregar de nuevo para añadirlo a su orden."
                     );
                 }, 300);
             }
@@ -731,8 +798,9 @@ function desactivarTTS() {
     speechSynth.cancel();
     voiceAssistantEnabled = false;
     isReadAloud = false;
+    clearReaderPending();
     document.getElementById('btn-read').classList.remove('active');
-    document.removeEventListener('click', leerElemento);
+    document.removeEventListener('click', leerElemento, true);
     if (recognitionInstance) {
         try { recognitionInstance.stop(); } catch(e) {}
         recognitionInstance = null;
