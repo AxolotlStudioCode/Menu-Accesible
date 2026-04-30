@@ -640,12 +640,11 @@ function aplicarModo(mode, blindChoice = null) {
                             renderizarOrden();
                             let resumen = "Bienvenido de nuevo. Su orden anterior tiene: ";
                             parsed.items.forEach(i => resumen += `${i.cantidad} ${i.nombre}, `);
-                            resumen += `Total: ${precioParaVoz(total)}. ¿Desea continuar o hacer cambios?`;
+                            resumen += `Total: ${precioParaVoz(total)}. Mantenga presionada la burbuja para hablar.`;
                             setTimeout(() => {
                                 actualizarBurbujaEstado('speaking', 'Escúchame...');
                                 hablar(resumen, () => {
-                                    actualizarBurbujaEstado('idle', 'Toca para hablar');
-                                    setTimeout(() => activarVozCiego(), 600);
+                                    actualizarBurbujaEstado('idle', 'Mantén presionado');
                                 });
                             }, 500);
                             return;
@@ -653,12 +652,11 @@ function aplicarModo(mode, blindChoice = null) {
                     } catch(e) {}
                 }
 
-                const mensajeBienvenida = "Hola, bienvenido. Soy su asistente de voz. Puedo ayudarle a pedir platillos, consultar ingredientes, personalizar su orden y enviarla al personal. Por ejemplo, puede decir: quiero dos tacos al pastor, o, ¿qué ingredientes tiene la hamburguesa? Toque la burbuja cuando quiera hablar. ¿Qué desea ordenar hoy?";
+                const mensajeBienvenida = "Hola, bienvenido. Soy su asistente de voz. Mantenga presionada la burbuja para hablar y suéltela cuando termine. Por ejemplo, puede decir: quiero dos tacos al pastor, o, qué ingredientes tiene la hamburguesa.";
                 setTimeout(() => {
                     actualizarBurbujaEstado('speaking', 'Escúchame...');
                     hablar(mensajeBienvenida, () => {
-                        actualizarBurbujaEstado('idle', 'Toca para hablar');
-                        setTimeout(() => activarVozCiego(), 600);
+                        actualizarBurbujaEstado('idle', 'Mantén presionado');
                     });
                 }, 500);
             } else if (blindChoice === 'tts') {
@@ -728,71 +726,137 @@ function actualizarBurbujaEstado(estado, textoStatus) {
     }
 }
 
-// Versión especial de activarVoz para modo ciego
-function activarVozCiego() {
-    if (!isBlindMode) { activarVoz(); return; }
-    if (!voiceAssistantEnabled) {
-        actualizarBurbujaEstado('idle', 'Asistente silenciado');
-        return;
-    }
+// ==========================================
+// PUSH-TO-TALK — modo ciego voz
+// ==========================================
+// El usuario mantiene presionado la burbuja para hablar y suelta para que el bot conteste.
+// No hay auto-reinicio ni colisiones de estado.
+
+let pttRecognition = null;   // instancia activa de SpeechRecognition
+let pttTranscript = '';      // lo que captó el micrófono
+let pttPresionado = false;   // ¿está el botón presionado ahora mismo?
+
+function iniciarEscucha(e) {
+    if (e) e.preventDefault();   // evitar doble-fire en touch + mouse
+    if (!voiceAssistantEnabled) return;
+    if (pttPresionado) return;    // ya está activo
+    pttPresionado = true;
+    pttTranscript = '';
+
+    // Feedback visual inmediato
+    const circle = document.getElementById('bubble-circle');
+    if (circle) { circle.classList.remove('idle', 'speaking'); circle.classList.add('pressing'); }
+
+    // Si el bot estaba hablando, silenciarlo para escuchar al usuario
+    speechSynth.cancel();
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        actualizarBurbujaEstado('idle', 'Voz no disponible');
-        hablar('Su navegador no soporta reconocimiento de voz. Por favor escriba su pedido.');
+        hablar('Su navegador no soporta reconocimiento de voz.');
+        pttPresionado = false;
         return;
     }
-    if (recognitionInstance) {
-        try { recognitionInstance.stop(); } catch(e) {}
-        recognitionInstance = null;
-        actualizarBurbujaEstado('idle', 'Toca para hablar');
+
+    actualizarBurbujaEstado('listening', 'Habla ahora...');
+
+    const rec = new SpeechRecognition();
+    pttRecognition = rec;
+    rec.lang = 'es-MX';
+    rec.continuous = true;        // captura mientras el botón está presionado
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (event) => {
+        // Acumular todos los resultados mientras el botón sigue presionado
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            pttTranscript += event.results[i][0].transcript + ' ';
+        }
+    };
+
+    rec.onerror = (event) => {
+        // 'no-speech' es normal si el usuario no habló — no hacer nada dramático
+        if (event.error !== 'no-speech') {
+            console.error('PTT error:', event.error);
+        }
+        pttPresionado = false;
+        pttRecognition = null;
+        actualizarBurbujaEstado('idle', 'Manten presionado');
+    };
+
+    rec.onend = () => {
+        pttRecognition = null;
+        // Si aún está presionado y terminó solo (timeout del navegador), reiniciar
+        if (pttPresionado) {
+            try {
+                const rec2 = new SpeechRecognition();
+                pttRecognition = rec2;
+                rec2.lang = 'es-MX';
+                rec2.continuous = true;
+                rec2.interimResults = false;
+                rec2.onresult = rec.onresult;
+                rec2.onerror = rec.onerror;
+                rec2.onend = rec.onend;
+                rec2.start();
+            } catch(err) {
+                pttPresionado = false;
+                actualizarBurbujaEstado('idle', 'Manten presionado');
+            }
+        }
+    };
+
+    try {
+        rec.start();
+    } catch(err) {
+        pttPresionado = false;
+        pttRecognition = null;
+        actualizarBurbujaEstado('idle', 'Manten presionado');
+    }
+}
+
+function detenerEscucha(e) {
+    if (e) e.preventDefault();
+    if (!pttPresionado) return;
+    pttPresionado = false;
+
+    // Quitar feedback visual de presionado
+    const circle = document.getElementById('bubble-circle');
+    if (circle) circle.classList.remove('pressing');
+
+    // Detener reconocimiento
+    if (pttRecognition) {
+        try { pttRecognition.stop(); } catch(err) {}
+        pttRecognition = null;
+    }
+
+    const texto = pttTranscript.trim();
+    pttTranscript = '';
+
+    if (!texto) {
+        // Nada captado — volver a idle
+        actualizarBurbujaEstado('idle', 'Mantén presionado');
         return;
     }
-    speechSynth.cancel();
-    const recognition = new SpeechRecognition();
-    recognitionInstance = recognition;
-    recognition.lang = 'es-MX';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    actualizarBurbujaEstado('listening', 'Escuchando...');
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        recognitionInstance = null;
-        actualizarBurbujaEstado('speaking', 'Procesando...');
-        document.getElementById('chatbot-input').value = transcript;
-        addMessage(transcript, 'user');
-        const respuesta = processBotMessageLocal(transcript);
-        setTimeout(() => {
-            addMessage(respuesta, 'bot');
-            actualizarBurbujaEstado('speaking', 'Respondiendo...');
-            hablar(respuesta, () => {
-                if (voiceAssistantEnabled) {
-                    actualizarBurbujaEstado('idle', 'Toca para hablar');
-                    setTimeout(() => activarVozCiego(), 800);
-                } else {
-                    actualizarBurbujaEstado('idle', 'Asistente silenciado');
-                }
-            });
-        }, 400);
-    };
-    recognition.onerror = (event) => {
-        console.error('Mic error:', event.error);
-        recognitionInstance = null;
-        if (voiceAssistantEnabled) {
-            actualizarBurbujaEstado('idle', 'Toca para hablar');
-        }
-    };
-    recognition.onend = () => {
-        if (recognitionInstance === recognition) {
-            recognitionInstance = null;
-            if (voiceAssistantEnabled) actualizarBurbujaEstado('idle', 'Toca para hablar');
-        }
-    };
+
+    // Mostrar lo que dijo el usuario y procesar
+    actualizarBurbujaEstado('speaking', 'Procesando...');
+    document.getElementById('chatbot-input').value = texto;
+    addMessage(texto, 'user');
+
+    const respuesta = processBotMessageLocal(texto);
     setTimeout(() => {
-        try { recognition.start(); } catch(err) {
-            recognitionInstance = null;
-            actualizarBurbujaEstado('idle', 'Toca para hablar');
-        }
-    }, 100);
+        addMessage(respuesta, 'bot');
+        actualizarBurbujaEstado('speaking', 'Respondiendo...');
+        hablar(respuesta, () => {
+            if (voiceAssistantEnabled) {
+                actualizarBurbujaEstado('idle', 'Mantén presionado');
+            }
+        });
+    }, 300);
+}
+
+// Mantener activarVozCiego como alias por si algún otro código lo llama
+function activarVozCiego() {
+    // No se usa en push-to-talk — no-op para evitar errores
 }
 
 function closeWelcome() { hideOverlay('welcome-overlay'); }
@@ -805,6 +869,9 @@ function desactivarTTS() {
     voiceAssistantEnabled = false;
     isReadAloud = false;
     clearReaderPending();
+    // Limpiar push-to-talk si estaba activo
+    pttPresionado = false;
+    if (pttRecognition) { try { pttRecognition.stop(); } catch(e) {} pttRecognition = null; }
     document.getElementById('btn-read').classList.remove('active');
     document.removeEventListener('click', leerElemento, true);
     if (recognitionInstance) {
