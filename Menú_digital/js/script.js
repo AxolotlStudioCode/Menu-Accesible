@@ -391,9 +391,10 @@ function selectMode(mode) {
             setTimeout(() => {
                 hablar(
                     "¿Cómo prefiere interactuar? " +
-                    "Opción uno: Asistente de voz activo. El chatbot le atenderá por voz. " +
-                    "Opción dos: Usar mi lector de pantalla. Solo se aplicará alto contraste y texto grande. " +
-                    "Diga uno o dos, o toque el botón.",
+                    "Opción uno: Lector de pantalla del dispositivo. Usa el TTS de su teléfono, la interfaz se muestra completa y puede pedir normalmente. " +
+                    "Opción dos: Chatbot IA por voz. El asistente de voz inteligente le atiende hablando. " +
+                    "Opción tres: Solo alto contraste y texto grande, sin TTS. " +
+                    "Diga uno, dos o tres, o toque el botón.",
                     () => iniciarMicElegirCiego()
                 );
             }, 200);
@@ -417,9 +418,11 @@ function iniciarMicElegirCiego() {
     rec.onresult = (e) => {
         blindChoiceRec = null;
         const texto = e.results[0][0].transcript.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        if (texto.includes('uno') || texto.includes('1') || texto.includes('voz') || texto.includes('asistente') || texto.includes('chatbot')) {
+        if (texto.includes('uno') || texto.includes('1') || texto.includes('tts') || texto.includes('lector') || texto.includes('telefono') || texto.includes('dispositivo')) {
+            setBlindMode('tts');
+        } else if (texto.includes('dos') || texto.includes('2') || texto.includes('voz') || texto.includes('asistente') || texto.includes('chatbot') || texto.includes('ia')) {
             setBlindMode('voice');
-        } else if (texto.includes('dos') || texto.includes('2') || texto.includes('lector') || texto.includes('pantalla')) {
+        } else if (texto.includes('tres') || texto.includes('3') || texto.includes('contraste') || texto.includes('pantalla')) {
             setBlindMode('reader');
         } else {
             setTimeout(() => iniciarMicElegirCiego(), 500);
@@ -439,9 +442,16 @@ function setBlindMode(choice) {
 
 function aplicarModo(mode, blindChoice = null) {
     sessionStorage.setItem('accessMode', mode);
+
+    // Por defecto, ocultar el chatbot en todos los modos excepto donde se necesita
+    const chatbotContainer = document.getElementById('chatbot-container');
+    if (chatbotContainer) chatbotContainer.style.display = 'none';
+
     switch (mode) {
         case 'deaf':
             document.querySelectorAll('.btn-secondary').forEach(b => { b.style.borderColor = '#2563EB'; b.style.background = '#DBEAFE'; });
+            // Mostrar chatbot en modo sordo también (pueden escribir)
+            if (chatbotContainer) chatbotContainer.style.display = '';
             break;
         case 'blind':
             if (!isHighContrast) toggleHighContrast();
@@ -453,13 +463,14 @@ function aplicarModo(mode, blindChoice = null) {
                 document.addEventListener('click', leerElemento);
                 activarModoCiego();
                 document.body.classList.add('blind-voice-simplified');
-                // Asegurar que la burbuja esté visible y los otros modos no la muestren
+                // Solo en este modo aparece la burbuja de voz
                 document.getElementById('blind-bubble').classList.remove('hidden');
+                // Chatbot visible pero sin botón toggle (la burbuja lo controla)
+                if (chatbotContainer) chatbotContainer.style.display = '';
                 const mensajes = document.getElementById('chatbot-messages');
                 mensajes.innerHTML = '';
                 addMessage("¡Hola! Soy su asistente de pedido. Diga el nombre de un platillo para pedirlo, pregunte ingredientes, o diga «ver mi orden» o «pagar». ¡Toque la burbuja cuando quiera hablar!", 'bot');
 
-                // Si hay orden previa en la sesión, mencionar resumen
                 const savedOrden = sessionStorage.getItem('ordenGuardada');
                 if (savedOrden) {
                     try {
@@ -492,25 +503,40 @@ function aplicarModo(mode, blindChoice = null) {
                         setTimeout(() => activarVozCiego(), 600);
                     });
                 }, 500);
+            } else if (blindChoice === 'tts') {
+                // Modo TTS del dispositivo: interfaz visual normal con ARIA enriquecido
+                // La burbuja de voz NO aparece - el TTS del teléfono (VoiceOver/TalkBack) lo hace
+                document.getElementById('blind-bubble').classList.add('hidden');
+                document.body.classList.add('blind-tts-mode');
+                isReadAloud = false; // No usamos el TTS interno de la página
+                voiceAssistantEnabled = false;
+                // Chatbot oculto en este modo
+                if (chatbotContainer) chatbotContainer.style.display = 'none';
+                // Aplicar ARIA live region y focus en el título del menú
+                setTimeout(() => {
+                    const titulo = document.querySelector('.section-title');
+                    if (titulo) titulo.focus();
+                }, 300);
             } else {
                 // reader: sin TTS, burbuja nunca visible
                 isReadAloud = false;
                 voiceAssistantEnabled = false;
                 document.getElementById('btn-read').classList.remove('active');
                 document.removeEventListener('click', leerElemento);
-                // Asegurarse que la burbuja NO aparece en modo reader
                 document.getElementById('blind-bubble').classList.add('hidden');
             }
             break;
         case 'quiet':
             closeWelcome();
-            // La burbuja tampoco aparece en modo quiet
             document.getElementById('blind-bubble').classList.add('hidden');
+            // En modo silencio sí se muestra el chatbot
+            if (chatbotContainer) chatbotContainer.style.display = '';
             setTimeout(() => { toggleChatbot(); setTimeout(() => document.getElementById('chatbot-input').focus(), 150); }, 300);
             break;
         default:
-            // Modo default: burbuja no aparece
+            // Modo default: burbuja no aparece, chatbot disponible
             document.getElementById('blind-bubble').classList.add('hidden');
+            if (chatbotContainer) chatbotContainer.style.display = '';
             break;
     }
 }
@@ -853,6 +879,63 @@ document.addEventListener('DOMContentLoaded', () => {
     // Asegurar que la burbuja siempre esté oculta al inicio
     const bubble = document.getElementById('blind-bubble');
     if (bubble) bubble.classList.add('hidden');
+
+    // Ocultar chatbot por defecto hasta que se elija el modo adecuado
+    const chatbotContainer = document.getElementById('chatbot-container');
+    if (chatbotContainer) chatbotContainer.style.display = 'none';
+
+    // ── MANEJO INLINE DEL BOTÓN "VER VIDEO" ──────────────────────────────
+    // Interceptar clicks en .btn-video-toggle para mostrar descripción debajo de la tarjeta
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-video-toggle');
+        if (!btn) return;
+
+        // Si es modo ciego-voz, dejar que el sistema de blindTap lo maneje
+        if (isBlindMode && document.body.classList.contains('blind-voice-simplified')) return;
+
+        e.stopPropagation();
+        const card = btn.closest('.card');
+        if (!card) return;
+
+        const descPanel = card.querySelector('.card-video-desc');
+        const nombre = btn.dataset.nombre;
+        const isOpen = btn.getAttribute('aria-expanded') === 'true';
+
+        if (isOpen) {
+            // Cerrar descripción inline
+            btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = '<i class="fas fa-play-circle"></i> Ver Video';
+            if (descPanel) {
+                descPanel.hidden = true;
+                descPanel.innerHTML = '';
+            }
+        } else {
+            // Abrir descripción inline
+            btn.setAttribute('aria-expanded', 'true');
+            btn.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
+            const data = platillosData[nombre];
+            if (descPanel && data) {
+                const ingredsList = data.ingredients.map(i => `<li>${i}</li>`).join('');
+                descPanel.innerHTML = `
+                    <div class="video-desc-inner">
+                        <p class="video-desc-text">${data.desc}</p>
+                        <details class="video-desc-ingredients">
+                            <summary><i class="fas fa-list-ul"></i> Ingredientes</summary>
+                            <ul>${ingredsList}</ul>
+                        </details>
+                        <button class="btn-open-video-modal" onclick="abrirVideo('${nombre}', '${btn.dataset.url}')">
+                            <i class="fas fa-play"></i> Ver video completo
+                        </button>
+                    </div>`;
+                descPanel.hidden = false;
+                // Si es modo TTS, leer descripción para el lector de pantalla del dispositivo
+                if (document.body.classList.contains('blind-tts-mode')) {
+                    descPanel.setAttribute('tabindex', '-1');
+                    setTimeout(() => descPanel.focus(), 100);
+                }
+            }
+        }
+    }, true); // capture para que corra antes del delegado global
 
     // sessionStorage: persiste en recarga, no en cierre de pestaña
     const savedMode = sessionStorage.getItem('accessMode');
