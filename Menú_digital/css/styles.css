@@ -110,7 +110,7 @@ body.blind-voice-simplified .blind-bubble:not(.hidden) {
 }
 
 .bubble-tap-hint {
-    font-size: 0.55rem;
+    font-size: 0.52rem;
     font-weight: 600;
     color: rgba(255,255,255,0.85);
     text-align: center;
@@ -125,6 +125,21 @@ body.blind-voice-simplified .blind-bubble:not(.hidden) {
 .bubble-circle.speaking .bubble-tap-hint,
 .bubble-circle.listening .bubble-tap-hint {
     display: none;
+}
+
+/* Feedback visual cuando el botón está presionado */
+.bubble-tap-btn:active ~ .bubble-circle,
+.bubble-tap-btn.pressed + .bubble-circle {
+    transform: scale(0.94);
+}
+
+/* El bubble-tap-btn cuando está activo da feedback de escala al círculo.
+   Como el btn está sobre el circle en z-index, usamos una clase JS 'pressing' en el propio circle */
+.bubble-circle.pressing {
+    transform: scale(0.94) !important;
+    box-shadow: 0 6px 28px rgba(16, 185, 129, 0.9), 0 0 0 12px rgba(16,185,129,0.2) !important;
+    background: linear-gradient(145deg, #34d399, #059669) !important;
+    animation: none !important;
 }
 
 .bubble-waves {
