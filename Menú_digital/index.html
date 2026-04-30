@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Menú Digital Accesible - Experiencia Inclusiva</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
     <!-- PANTALLA DE BIENVENIDA (selección de modo) -->
-    <div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title" style="display:none">
+    <div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title" style="display:none;">
         <div class="welcome-modal">
+            <!-- Botón silenciar: fijo arriba a la derecha del modal -->
             <button class="btn-mute-tts" id="btn-disable-tts" onclick="desactivarTTS()" 
                     aria-label="Silenciar audio">
                 <i class="fas fa-volume-xmark"></i> Silenciar
@@ -56,7 +57,7 @@
     </div>
 
     <!-- DIÁLOGO PARA MODO CIEGO (elección de asistente) -->
-    <div class="welcome-overlay blind-choice-overlay" id="blind-choice-overlay" role="dialog" aria-modal="true" aria-labelledby="blind-choice-title" style="display:none">
+    <div class="welcome-overlay blind-choice-overlay" id="blind-choice-overlay" role="dialog" aria-modal="true" aria-labelledby="blind-choice-title" style="display:none;">
         <div class="welcome-modal blind-choice-modal">
             <h2 id="blind-choice-title">¿Cómo prefiere interactuar?</h2>
             <p class="welcome-sub">Elija su método de asistencia para navegar el menú.</p>
@@ -402,6 +403,14 @@
                             aria-label="Agregar Filete de Salmón a la orden, precio 24 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
+                    <div class="card-actions">
+                        <button class="btn btn-primary"
+                            data-action="agregar"
+                            data-nombre="Filete de Salmón"
+                            data-precio="24.99"
+                            aria-label="Agregar Filete de Salmón a la orden, precio 24 dólares 99 centavos">
+                            <i class="fas fa-plus-circle"></i> Agregar
+                        </button>
                         <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Filete de Salmón"
@@ -473,7 +482,9 @@
         <div class="bubble-status" id="bubble-status">Toca para hablar</div>
         <div class="bubble-text" id="bubble-text"></div>
         <button class="bubble-tap-btn" id="bubble-tap-btn"
-                aria-label="Mantén presionado para hablar">
+                aria-label="Mantén presionado para hablar"
+                onmousedown="iniciarEscucha()" onmouseup="detenerEscucha()" onmouseleave="detenerEscucha()"
+                ontouchstart="iniciarEscucha(event)" ontouchend="detenerEscucha(event)" ontouchcancel="detenerEscucha(event)">
         </button>
     </div>
 
@@ -521,7 +532,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
 
     <!-- Delegación de eventos para botones de acción (compatible con doble-tap) -->
     <script>
