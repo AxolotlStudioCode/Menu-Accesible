@@ -539,6 +539,10 @@
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
 
+            // En modo reader (lector de página) el sistema de doble-toque en script.js
+            // ya maneja todo — no interferir aquí.
+            if (isReadAloud && !isBlindMode) return;
+
             // Los botones de video con clase btn-video-toggle son manejados por el listener
             // en DOMContentLoaded del script.js (descripción inline). Solo pasar al modal
             // si es modo ciego-voz o si se usa blindTap directamente.
