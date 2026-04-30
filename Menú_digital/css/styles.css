@@ -61,8 +61,8 @@ body.blind-voice-simplified .welcome-overlay {
     display: none !important;
 }
 
-/* Mostrar la burbuja central — SOLO cuando no tiene la clase hidden */
-body.blind-voice-simplified .blind-bubble:not(.hidden) {
+/* Mostrar la burbuja central */
+body.blind-voice-simplified .blind-bubble {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -73,11 +73,6 @@ body.blind-voice-simplified .blind-bubble:not(.hidden) {
     transform: translate(-50%, -50%);
     z-index: 1000;
     gap: 0;
-}
-
-/* La clase .hidden SIEMPRE oculta la burbuja, sin excepción */
-.blind-bubble.hidden {
-    display: none !important;
 }
 
 .bubble-circle {
@@ -97,49 +92,14 @@ body.blind-voice-simplified .blind-bubble:not(.hidden) {
 
 .bubble-icon {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
     width: 70px;
     height: 70px;
     color: white;
     font-size: 2.2rem;
     transition: all 0.3s ease;
     z-index: 3;
-}
-
-.bubble-tap-hint {
-    font-size: 0.52rem;
-    font-weight: 600;
-    color: rgba(255,255,255,0.85);
-    text-align: center;
-    line-height: 1.2;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-    text-transform: uppercase;
-    pointer-events: none;
-}
-
-/* Ocultar hint cuando está hablando o escuchando */
-.bubble-circle.speaking .bubble-tap-hint,
-.bubble-circle.listening .bubble-tap-hint {
-    display: none;
-}
-
-/* Feedback visual cuando el botón está presionado */
-.bubble-tap-btn:active ~ .bubble-circle,
-.bubble-tap-btn.pressed + .bubble-circle {
-    transform: scale(0.94);
-}
-
-/* El bubble-tap-btn cuando está activo da feedback de escala al círculo.
-   Como el btn está sobre el circle en z-index, usamos una clase JS 'pressing' en el propio circle */
-.bubble-circle.pressing {
-    transform: scale(0.94) !important;
-    box-shadow: 0 6px 28px rgba(16, 185, 129, 0.9), 0 0 0 12px rgba(16,185,129,0.2) !important;
-    background: linear-gradient(145deg, #34d399, #059669) !important;
-    animation: none !important;
 }
 
 .bubble-waves {
@@ -904,11 +864,6 @@ header {
     position: relative;
 }
 
-/* Ensure speak button has enough top space to clear the absolute mute button */
-.welcome-modal .welcome-speak {
-    margin-top: 44px;
-}
-
 .welcome-skip {
     background: none;
     border: none;
@@ -1631,16 +1586,6 @@ body.blind-mode .video-info {
     .welcome-speak {
         padding: 10px 16px;
         font-size: 0.85rem;
-        /* Ensure it doesn't overlap with the absolute mute button */
-        margin-top: 52px;
-        margin-bottom: 20px;
-    }
-    /* Fix for mute button overlapping speak-instructions on mobile */
-    .btn-mute-tts {
-        top: 12px;
-        right: 12px;
-        padding: 6px 12px;
-        font-size: 0.78rem;
     }
     .chatbot-window {
         width: calc(100vw - 12px);
@@ -1709,240 +1654,5 @@ body.blind-mode .video-info {
     }
     .chatbot-window {
         height: 85vh;
-    }
-}
-
-/* ==========================================
-   MODAL DE INGREDIENTES
-   ========================================== */
-.ingredientes-modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(4px);
-    z-index: 3000;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-.ingredientes-modal-overlay.active {
-    display: flex;
-}
-.ingredientes-modal-content {
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    padding: 32px 28px 28px;
-    max-width: 480px;
-    width: 100%;
-    position: relative;
-    box-shadow: var(--shadow-xl);
-    animation: modalIn 0.25s ease;
-    max-height: 85vh;
-    overflow-y: auto;
-}
-@keyframes modalIn {
-    from { opacity: 0; transform: scale(0.93) translateY(12px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-.ingredientes-modal-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: var(--bg-app);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: all 0.2s;
-    font-size: 0.85rem;
-}
-.ingredientes-modal-close:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
-.ingredientes-modal-content h3 {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.4rem;
-    font-weight: 800;
-    margin-bottom: 6px;
-    color: var(--text-main);
-    padding-right: 30px;
-}
-.ing-modal-sub {
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    margin-bottom: 20px;
-}
-.ing-checks-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 24px;
-}
-.ing-check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg-app);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 10px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-size: 0.88rem;
-    color: var(--text-main);
-}
-.ing-check:has(input:checked) {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    color: var(--primary-dark);
-}
-.ing-check input[type="checkbox"] {
-    accent-color: var(--primary);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.ing-modal-actions {
-    display: flex;
-    gap: 10px;
-}
-.ing-modal-actions .btn {
-    flex: 1;
-}
-@media (max-width: 480px) {
-    .ing-checks-grid {
-        grid-template-columns: 1fr;
-    }
-    .ing-modal-actions {
-        flex-direction: column;
-    }
-    .ingredientes-modal-content {
-        padding: 24px 16px 20px;
-    }
-}
-
-/* ==========================================
-   MODO CIEGO – TTS DEL DISPOSITIVO
-   ========================================== */
-/* La interfaz se ve igual que los demás modos pero con mejoras de accesibilidad ARIA */
-body.blind-tts-mode .card {
-    outline: 3px solid transparent;
-    transition: outline-color 0.2s;
-}
-body.blind-tts-mode .card:focus-within {
-    outline-color: var(--primary);
-}
-/* Hacer que el título de sección sea enfocable para que VoiceOver lo anuncie */
-body.blind-tts-mode .section-title {
-    outline: none;
-}
-
-/* ==========================================
-   DESCRIPCIÓN INLINE DE VIDEO (todos los modos)
-   ========================================== */
-.card-video-desc {
-    margin-top: 10px;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    animation: slideDown 0.25s ease;
-}
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-.video-desc-inner {
-    background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.video-desc-text {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.55;
-}
-.video-desc-ingredients {
-    font-size: 0.85rem;
-    color: var(--text-main);
-}
-.video-desc-ingredients summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    list-style: none;
-    user-select: none;
-}
-.video-desc-ingredients summary::-webkit-details-marker { display: none; }
-.video-desc-ingredients ul {
-    margin-top: 8px;
-    padding-left: 18px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 12px;
-}
-.video-desc-ingredients li {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-}
-.btn-open-video-modal {
-    align-self: flex-start;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 8px 14px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.2s;
-}
-.btn-open-video-modal:hover {
-    background: var(--primary-dark);
-}
-
-/* Ajuste del botón Ver Video cuando está expandido */
-.btn-video-toggle[aria-expanded="true"] {
-    background: #EFF6FF;
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-/* Alto contraste para descripciones inline */
-body.high-contrast .video-desc-inner {
-    background: #000;
-    border-color: #FFD700;
-    color: #FFD700;
-}
-body.high-contrast .video-desc-text,
-body.high-contrast .video-desc-ingredients {
-    color: #FFD700;
-}
-body.high-contrast .btn-open-video-modal {
-    background: #FFD700;
-    color: #000;
-}
-
-@media (max-width: 480px) {
-    .video-desc-ingredients ul {
-        grid-template-columns: 1fr;
     }
 }
