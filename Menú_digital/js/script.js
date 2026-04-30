@@ -388,8 +388,15 @@ function describir(target) {
 }
 
 function leerElemento(e) {
-    // Ignorar clicks que vienen de dentro del panel de accesibilidad
+    // Zonas donde el reader NO debe interceptar
     if (e.target.closest('.accessibility-panel') || e.target.closest('.panel-content')) return;
+    // Modal de video abierto: dejar pasar todos sus clicks (cerrar, iframe, etc.)
+    if (document.getElementById('video-modal').classList.contains('active')) return;
+    // Boton X de eliminar item del carrito
+    if (e.target.closest('.btn-remove')) return;
+    // Modal de ingredientes abierto
+    const ingModal = document.getElementById('ingredientes-modal');
+    if (ingModal && ingModal.classList.contains('active')) return;
 
     const key = getElementKey(e.target);
     if (!key) return;
@@ -398,7 +405,7 @@ function leerElemento(e) {
     e.stopPropagation();
 
     if (readerPendingKey && readerPendingKey === key) {
-        // ── SEGUNDO TOQUE: ejecutar acción ─────────────────────────────
+        // SEGUNDO TOQUE: ejecutar accion
         const actionToRun = readerPendingAction;
         clearReaderPending();
         speechSynth.cancel();
@@ -407,7 +414,7 @@ function leerElemento(e) {
             setTimeout(() => actionToRun(), 400);
         }
     } else {
-        // ── PRIMER TOQUE: leer descripción ─────────────────────────────
+        // PRIMER TOQUE: leer descripcion
         const info = describir(e.target);
         if (!info) return;
         clearReaderPending();
@@ -415,7 +422,6 @@ function leerElemento(e) {
         readerPendingAction = info.action;
         speechSynth.cancel();
         hablar(info.texto);
-        // Limpiar pending después de 10 s sin segundo toque
         readerPendingTimeout = setTimeout(() => clearReaderPending(), 10000);
     }
 }
@@ -1105,6 +1111,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.btn-video-toggle');
         if (!btn) return;
+
+        // En modo reader, leerElemento lo maneja (abre modal directo en 2do toque)
+        if (isReadAloud && !isBlindMode) return;
 
         // Si es modo ciego-voz, dejar que el sistema de blindTap lo maneje
         if (isBlindMode && document.body.classList.contains('blind-voice-simplified')) return;
