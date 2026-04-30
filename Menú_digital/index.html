@@ -62,15 +62,20 @@
             <h2 id="blind-choice-title">¿Cómo prefiere interactuar?</h2>
             <p class="welcome-sub">Elija su método de asistencia para navegar el menú.</p>
             <div class="welcome-options">
+                <button class="welcome-option" onclick="setBlindMode('tts')">
+                    <div class="option-icon-wrapper"><i class="fas fa-mobile-screen-button"></i></div>
+                    <span class="option-title">Lector de pantalla del dispositivo</span>
+                    <span class="option-desc">Usa el TTS de su teléfono (VoiceOver / TalkBack). Cada platillo describe ingredientes al tocarlo y puede pedir sin problemas.</span>
+                </button>
                 <button class="welcome-option" onclick="setBlindMode('voice')">
-                    <div class="option-icon-wrapper"><i class="fas fa-microphone"></i></div>
-                    <span class="option-title">Asistente de voz activo</span>
-                    <span class="option-desc">El chatbot se activará para atender su pedido por voz</span>
+                    <div class="option-icon-wrapper"><i class="fas fa-robot"></i></div>
+                    <span class="option-title">Chatbot IA por voz</span>
+                    <span class="option-desc">El asistente de voz inteligente le atiende su pedido hablando</span>
                 </button>
                 <button class="welcome-option" onclick="setBlindMode('reader')">
                     <div class="option-icon-wrapper"><i class="fas fa-volume-up"></i></div>
-                    <span class="option-title">Usar mi lector de pantalla</span>
-                    <span class="option-desc">Solo se aplicará alto contraste y texto grande</span>
+                    <span class="option-title">Solo alto contraste y texto grande</span>
+                    <span class="option-desc">Sin TTS automático, navegación visual con alto contraste</span>
                 </button>
             </div>
         </div>
@@ -126,7 +131,9 @@
             </div>
 
             <!-- Platillos (8 artículos) -->
-            <article class="card" data-name="Tacos al Pastor" data-price="12.99">
+            <article class="card" data-name="Tacos al Pastor" data-price="12.99"
+                data-desc="Tradicionales tacos de cerdo marinado con achiote, chile guajillo y piña natural, servidos en tortilla de maíz con cilantro y cebolla. Ingredientes: carne de cerdo, chile guajillo, chile ancho, piña natural, achiote, cilantro, cebolla, tortillas de maíz."
+                aria-label="Platillo: Tacos al Pastor, precio 12 dólares 99 centavos. Tradicionales tacos de cerdo marinado con piña, cilantro y cebolla en tortilla de maíz. Contiene gluten y lácteos. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Taco.png" alt="Tacos al Pastor con carne de cerdo marinada, piña, cilantro y cebolla">
                     <div class="card-overlay"><span class="price-tag">$12.99</span></div>
@@ -146,18 +153,22 @@
                             aria-label="Agregar Tacos al Pastor a la orden, precio 12 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Tacos al Pastor"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Tacos al Pastor en lenguaje de señas">
+                            aria-label="Ver video informativo de Tacos al Pastor en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Hamburguesa Clásica" data-price="14.99">
+            <article class="card" data-name="Hamburguesa Clásica" data-price="14.99"
+                data-desc="Jugosa hamburguesa artesanal de 200g de carne de res, con queso cheddar fundido, lechuga romana crujiente, tomate y cebolla, en pan brioche. Ingredientes: carne de res molida premium, queso cheddar, lechuga romana, tomate, cebolla, pepinillos, pan brioche, salsas especiales."
+                aria-label="Platillo: Hamburguesa Clásica, precio 14 dólares 99 centavos. Jugosa hamburguesa de res con queso cheddar, lechuga y tomate. Contiene gluten, lácteos y huevo. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Hamburguesa.png" alt="Hamburguesa clásica con carne de res, queso, lechuga y tomate">
                     <div class="card-overlay"><span class="price-tag">$14.99</span></div>
@@ -178,18 +189,22 @@
                             aria-label="Agregar Hamburguesa Clásica a la orden, precio 14 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Hamburguesa Clásica"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Hamburguesa Clásica en lenguaje de señas">
+                            aria-label="Ver video informativo de Hamburguesa Clásica en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Pizza Margarita" data-price="16.99">
+            <article class="card" data-name="Pizza Margarita" data-price="16.99"
+                data-desc="Pizza tradicional italiana con masa artesanal, tomates San Marzano, mozzarella di bufala fresca, albahaca y aceite de oliva virgen extra. Ingredientes: masa de pizza artesanal, tomates San Marzano, mozzarella di bufala, albahaca fresca, aceite de oliva extra virgen, sal marina, orégano."
+                aria-label="Platillo: Pizza Margarita, precio 16 dólares 99 centavos. Pizza italiana con masa artesanal, tomate, mozzarella y albahaca. Contiene gluten y lácteos. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Pizza.png" alt="Pizza margarita con tomate, mozzarella y albahaca">
                     <div class="card-overlay"><span class="price-tag">$16.99</span></div>
@@ -209,18 +224,22 @@
                             aria-label="Agregar Pizza Margarita a la orden, precio 16 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Pizza Margarita"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pizza Margarita en lenguaje de señas">
+                            aria-label="Ver video informativo de Pizza Margarita en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Sushi Roll California" data-price="18.99">
+            <article class="card" data-name="Sushi Roll California" data-price="18.99"
+                data-desc="Rollo de sushi estilo California con imitación de cangrejo, aguacate cremoso y pepino fresco, envuelto en arroz y nori, cubierto con ajonjolí. Ingredientes: arroz para sushi, nori (alga marina), imitación de cangrejo, aguacate, pepino, mayonesa japonesa, semillas de ajonjolí, salsa de soya."
+                aria-label="Platillo: Sushi Roll California, precio 18 dólares 99 centavos. Roll de sushi con cangrejo, aguacate y pepino. Contiene pescado, soya y huevo. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Sushi.png" alt="Sushi roll california con cangrejo, aguacate y pepino">
                     <div class="card-overlay"><span class="price-tag">$18.99</span></div>
@@ -241,18 +260,22 @@
                             aria-label="Agregar Sushi Roll California a la orden, precio 18 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Sushi Roll California"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Sushi Roll California en lenguaje de señas">
+                            aria-label="Ver video informativo de Sushi Roll California en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Ensalada César" data-price="11.99">
+            <article class="card" data-name="Ensalada César" data-price="11.99"
+                data-desc="Clásica ensalada César con lechuga romana crujiente, aderezo césar casero, crutones dorados y queso parmesano rallado. Ingredientes: lechuga romana, queso parmesano, huevo, pan para crutones, aceite de oliva, mostaza Dijon, limón, ajo."
+                aria-label="Platillo: Ensalada César, precio 11 dólares 99 centavos. Lechuga romana con aderezo césar, crutones y parmesano. Contiene lácteos, huevo y gluten. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Ensalada.png" alt="Ensalada césar con lechuga, crutones y parmesano">
                     <div class="card-overlay"><span class="price-tag">$11.99</span></div>
@@ -273,18 +296,22 @@
                             aria-label="Agregar Ensalada César a la orden, precio 11 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Ensalada César"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Ensalada César en lenguaje de señas">
+                            aria-label="Ver video informativo de Ensalada César en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Pasta Carbonara" data-price="15.99">
+            <article class="card" data-name="Pasta Carbonara" data-price="15.99"
+                data-desc="Auténtica pasta carbonara romana con espagueti al dente, panceta crujiente, huevo fresco, queso pecorino romano y pimienta negra molida. Ingredientes: espagueti, panceta, queso pecorino romano, huevo, pimienta negra, sal."
+                aria-label="Platillo: Pasta Carbonara, precio 15 dólares 99 centavos. Pasta italiana con panceta, huevo y queso pecorino. Contiene gluten, lácteos, huevo y cerdo. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Salsa Carbonara.png" alt="Pasta carbonara con panceta, huevo y queso">
                     <div class="card-overlay"><span class="price-tag">$15.99</span></div>
@@ -306,18 +333,22 @@
                             aria-label="Agregar Pasta Carbonara a la orden, precio 15 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Pasta Carbonara"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pasta Carbonara en lenguaje de señas">
+                            aria-label="Ver video informativo de Pasta Carbonara en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Pollo Teriyaki" data-price="17.99">
+            <article class="card" data-name="Pollo Teriyaki" data-price="17.99"
+                data-desc="Pechuga de pollo jugosa marinada y glaseada con salsa teriyaki casera de soya y jengibre, acompañada de vegetales salteados. Ingredientes: pechuga de pollo, salsa de soya, sake, azúcar, jengibre, ajo, vegetales variados."
+                aria-label="Platillo: Pollo Teriyaki, precio 17 dólares 99 centavos. Pechuga de pollo glaseada con salsa teriyaki y vegetales. Contiene soya y gluten. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Pollo Teriyaki.png" alt="Pollo teriyaki glaseado con salsa teriyaki">
                     <div class="card-overlay"><span class="price-tag">$17.99</span></div>
@@ -337,18 +368,22 @@
                             aria-label="Agregar Pollo Teriyaki a la orden, precio 17 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Pollo Teriyaki"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Pollo Teriyaki en lenguaje de señas">
+                            aria-label="Ver video informativo de Pollo Teriyaki en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
 
-            <article class="card" data-name="Filete de Salmón" data-price="24.99">
+            <article class="card" data-name="Filete de Salmón" data-price="24.99"
+                data-desc="Filete de salmón noruego fresco a la parrilla con mantequilla de hierbas, limón, eneldo y perejil, acompañado de papas al vapor y espárragos. Ingredientes: filete de salmón noruego, limón, mantequilla, perejil, eneldo, papas, espárragos, sal y pimienta."
+                aria-label="Platillo: Filete de Salmón, precio 24 dólares 99 centavos. Salmón noruego a la parrilla con hierbas y vegetales. Contiene pescado y lácteos. Toque Agregar para añadir a su orden.">
                 <div class="card-image">
                     <img src="assets/images/Filete de salmón.png" alt="Filete de salmón a la parrilla con limón">
                     <div class="card-overlay"><span class="price-tag">$24.99</span></div>
@@ -368,14 +403,24 @@
                             aria-label="Agregar Filete de Salmón a la orden, precio 24 dólares 99 centavos">
                             <i class="fas fa-plus-circle"></i> Agregar
                         </button>
-                        <button class="btn btn-secondary"
+                    <div class="card-actions">
+                        <button class="btn btn-primary"
+                            data-action="agregar"
+                            data-nombre="Filete de Salmón"
+                            data-precio="24.99"
+                            aria-label="Agregar Filete de Salmón a la orden, precio 24 dólares 99 centavos">
+                            <i class="fas fa-plus-circle"></i> Agregar
+                        </button>
+                        <button class="btn btn-secondary btn-video-toggle"
                             data-action="video"
                             data-nombre="Filete de Salmón"
                             data-url="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                            aria-label="Ver video informativo de Filete de Salmón en lenguaje de señas">
+                            aria-label="Ver video informativo de Filete de Salmón en lenguaje de señas"
+                            aria-expanded="false">
                             <i class="fas fa-play-circle"></i> Ver Video
                         </button>
                     </div>
+                    <div class="card-video-desc" aria-live="polite" hidden></div>
                 </div>
             </article>
         </section>
@@ -440,8 +485,8 @@
         </button>
     </div>
 
-    <!-- CHATBOT (se usa como entrada/salida en modo ciego voz) -->
-    <div class="chatbot-container">
+    <!-- CHATBOT (solo visible en modo ciego-voz chatbot IA, y modo silencio) -->
+    <div class="chatbot-container" id="chatbot-container">
         <button class="chatbot-toggle" onclick="toggleChatbot()" aria-expanded="false" aria-label="Abrir asistente virtual">
             <i class="fas fa-headset"></i>
             <span>Asistente Virtual</span>
@@ -493,6 +538,11 @@
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
 
+            // Los botones de video con clase btn-video-toggle son manejados por el listener
+            // en DOMContentLoaded del script.js (descripción inline). Solo pasar al modal
+            // si es modo ciego-voz o si se usa blindTap directamente.
+            if (btn.classList.contains('btn-video-toggle') && !isBlindMode) return;
+
             const action = btn.dataset.action;
             const label  = btn.getAttribute('aria-label') || btn.textContent.trim();
 
@@ -500,11 +550,9 @@
                 const nombre = btn.dataset.nombre;
                 const precio = parseFloat(btn.dataset.precio);
                 if (isBlindMode) {
-                    // Modo ciego: doble-tap directo, el bot ya maneja ingredientes por voz
                     const fn = () => agregarAlCarrito(nombre, precio, 1);
                     blindTap(label, fn, e);
                 } else {
-                    // Modo normal: abrir modal de ingredientes
                     e.preventDefault();
                     abrirModalIngredientes(nombre, precio);
                 }
