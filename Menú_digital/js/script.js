@@ -58,6 +58,19 @@ const platillosData = {
 };
 
 // ==========================================
+// UTILIDAD: FORMATEAR PRECIO PARA TTS
+// ==========================================
+// Convierte 12.99 → "12 pesos con 99 centavos" para evitar que el TTS lo lea como fecha
+function precioParaVoz(precio) {
+    const n = parseFloat(precio);
+    if (isNaN(n)) return precio;
+    const pesos = Math.floor(n);
+    const centavos = Math.round((n - pesos) * 100);
+    if (centavos === 0) return `${pesos} pesos`;
+    return `${pesos} pesos con ${centavos} centavos`;
+}
+
+// ==========================================
 // SISTEMA DE VOZ
 // ==========================================
 function hablar(texto, onEnd) {
@@ -257,35 +270,100 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ==========================================
-// ACCESIBILIDAD — lector de pantalla
+// ACCESIBILIDAD — lector de pantalla con doble toque real
 // ==========================================
-function toggleReadAloud() {
-    isReadAloud = !isReadAloud;
-    document.getElementById('btn-read').classList.toggle('active', isReadAloud);
-    if (isReadAloud) {
-        hablar('Lector de pantalla activado.');
-        document.addEventListener('click', leerElemento);
-    } else {
-        speechSynth.cancel();
-        document.removeEventListener('click', leerElemento);
-    }
+// Estado del sistema de doble toque para el lector de página
+let readerPendingEl = null;
+let readerPendingTimeout = null;
+let readerPendingAction = null;
+
+function clearReaderPending() {
+    if (readerPendingTimeout) { clearTimeout(readerPendingTimeout); readerPendingTimeout = null; }
+    readerPendingEl = null;
+    readerPendingAction = null;
 }
-function leerElemento(e) {
-    let texto = '';
-    const target = e.target;
-    if (target.closest('.card')) {
-        const card = target.closest('.card');
+
+// Construir descripción hablada completa de un elemento tocado
+function describir(target) {
+    // Botón Agregar
+    const btnAgregar = target.closest('[data-action="agregar"]');
+    if (btnAgregar) {
+        const nombre = btnAgregar.dataset.nombre;
+        const precio = btnAgregar.dataset.precio;
+        return { texto: `Botón Agregar. ${nombre}. Precio: ${precioParaVoz(precio)}. Toque de nuevo para agregar a su orden.`, action: () => abrirModalIngredientes(nombre, parseFloat(precio)) };
+    }
+    // Botón Ver Video
+    const btnVideo = target.closest('.btn-video-toggle, [data-action="video"]');
+    if (btnVideo) {
+        const nombre = btnVideo.dataset.nombre || '';
+        return { texto: `Botón Ver Video. ${nombre}. Toque de nuevo para ver la descripción y video del platillo.`, action: null };
+    }
+    // Botón descargar orden
+    const btnDescargar = target.closest('[data-action="descargar"]');
+    if (btnDescargar) {
+        return { texto: `Botón Descargar Orden. Toque de nuevo para descargar su orden.`, action: () => descargarOrden() };
+    }
+    // Tarjeta completa (cuando se toca el fondo de la tarjeta, no un botón)
+    const card = target.closest('.card');
+    if (card && !target.closest('button')) {
         const nombre = card.dataset.name;
         const precio = card.dataset.price;
         const desc = card.dataset.desc || '';
-        texto = `Platillo: ${nombre}. Precio: ${precio} pesos. ${desc}`;
-    } else if (target.closest('.btn-primary[data-action="agregar"]')) {
-        const btn = target.closest('[data-action="agregar"]');
-        texto = `Agregar ${btn.dataset.nombre} a la orden por ${btn.dataset.precio} pesos.`;
-    } else if (target.closest('.btn-secondary')) {
-        texto = 'Botón: Ver descripción y video del platillo.';
+        const platillo = platillosData[nombre];
+        let texto = `Platillo: ${nombre}. Precio: ${precioParaVoz(precio)}. `;
+        if (platillo) {
+            texto += platillo.desc + ' Ingredientes: ' + platillo.ingredients.join(', ') + '. ';
+        } else if (desc) {
+            texto += desc + '. ';
+        }
+        texto += 'Toque de nuevo para seleccionar este platillo.';
+        return { texto, action: null };
     }
-    if (texto) hablar(texto);
+    // Cualquier botón genérico
+    const btn = target.closest('button');
+    if (btn) {
+        const lbl = btn.getAttribute('aria-label') || btn.textContent.trim();
+        if (lbl) return { texto: `Botón: ${lbl}. Toque de nuevo para activar.`, action: () => btn.click() };
+    }
+    return null;
+}
+
+function leerElemento(e) {
+    const info = describir(e.target);
+    if (!info) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isSameEl = readerPendingEl && readerPendingEl === e.target.closest('button, .card, article');
+    if (isSameEl) {
+        // Segundo toque: confirmar y ejecutar
+        clearReaderPending();
+        hablar('Confirmado.');
+        if (readerPendingAction) setTimeout(() => readerPendingAction(), 300);
+    } else {
+        // Primer toque: leer descripción completa
+        clearReaderPending();
+        readerPendingEl = e.target.closest('button, .card, article') || e.target;
+        readerPendingAction = info.action;
+        speechSynth.cancel();
+        hablar(info.texto);
+        // Limpiar pending después de 8 segundos sin segundo toque
+        readerPendingTimeout = setTimeout(() => clearReaderPending(), 8000);
+    }
+}
+
+function toggleReadAloud() {
+    isReadAloud = !isReadAloud;
+    document.getElementById('btn-read').classList.toggle('active', isReadAloud);
+    clearReaderPending();
+    if (isReadAloud) {
+        hablar('Lector de pantalla activado. Toque cualquier elemento para escuchar su descripción. Toque dos veces para activarlo.');
+        document.addEventListener('click', leerElemento, true);
+    } else {
+        speechSynth.cancel();
+        document.removeEventListener('click', leerElemento, true);
+    }
 }
 
 // ==========================================
@@ -467,7 +545,7 @@ function aplicarModo(mode, blindChoice = null) {
                 isReadAloud = true;
                 voiceAssistantEnabled = true;
                 document.getElementById('btn-read').classList.add('active');
-                document.addEventListener('click', leerElemento);
+                document.addEventListener('click', leerElemento, true);
                 activarModoCiego();
                 document.body.classList.add('blind-voice-simplified');
                 // Solo en este modo aparece la burbuja de voz
@@ -489,7 +567,7 @@ function aplicarModo(mode, blindChoice = null) {
                             renderizarOrden();
                             let resumen = "Bienvenido de nuevo. Su orden anterior tiene: ";
                             parsed.items.forEach(i => resumen += `${i.cantidad} ${i.nombre}, `);
-                            resumen += `Total: ${total.toFixed(2)} pesos. ¿Desea continuar o hacer cambios?`;
+                            resumen += `Total: ${precioParaVoz(total)}. ¿Desea continuar o hacer cambios?`;
                             setTimeout(() => {
                                 actualizarBurbujaEstado('speaking', 'Escúchame...');
                                 hablar(resumen, () => {
@@ -529,7 +607,7 @@ function aplicarModo(mode, blindChoice = null) {
                 isReadAloud = true;
                 voiceAssistantEnabled = true;
                 document.getElementById('btn-read').classList.add('active');
-                document.addEventListener('click', leerElemento);
+                document.addEventListener('click', leerElemento, true);
                 document.getElementById('blind-bubble').classList.add('hidden');
                 // Anunciar activación por voz de la página
                 setTimeout(() => {
@@ -686,80 +764,135 @@ function sendMessage() {
         if (isReadAloud) hablar(respuesta);
     }, 600);
 }
-const numerosTexto = { 'un':1, 'uno':1, 'una':1, 'dos':2, 'tres':3, 'cuatro':4, 'cinco':5, 'seis':6, 'siete':7, 'ocho':8, 'nueve':9, 'diez':10 };
+const numerosTexto = { 'un':1, 'uno':1, 'una':1, 'dos':2, 'tres':3, 'cuatro':4, 'cinco':5, 'seis':6, 'siete':7, 'ocho':8, 'nueve':9, 'diez':10, 'media docena':6, 'docena':12 };
 function extraerCantidad(texto) {
     const matchNum = texto.match(/\b(\d+)\b/);
     if (matchNum) return parseInt(matchNum[0]);
     for (let p in numerosTexto) if (texto.includes(p)) return numerosTexto[p];
     return 1;
 }
+
+// Aliases y palabras clave alternativas para detectar platillos por nombre parcial o coloquial
+const platilloAliases = {
+    'Tacos al Pastor': ['taco', 'tacos', 'pastor', 'taquito', 'taquitos', 'taco pastor', 'tacos pastor', 'al pastor'],
+    'Hamburguesa Clásica': ['hamburguesa', 'hamburguesas', 'burger', 'burguesa', 'hamburgesa', 'hamburger', 'clasica', 'clásica'],
+    'Pizza Margarita': ['pizza', 'pizzas', 'margarita', 'margherita', 'margaritas', 'piza'],
+    'Sushi Roll California': ['sushi', 'sushis', 'roll', 'rolls', 'california', 'cangrejo', 'maki', 'makis', 'rollo', 'rollos', 'roll california', 'sushi california', 'sushi roll'],
+    'Ensalada César': ['ensalada', 'ensaladas', 'cesar', 'césar', 'ensalada cesar', 'ensalada verde'],
+    'Pasta Carbonara': ['pasta', 'pastas', 'carbonara', 'espagueti', 'spaghetti', 'spagueti', 'carbonara pasta'],
+    'Pollo Teriyaki': ['pollo', 'pollos', 'teriyaki', 'pollo teriyaki', 'teriyaky', 'pollo asian'],
+    'Filete de Salmón': ['salmon', 'salmón', 'filete', 'filete salmon', 'filete de salmon', 'pescado']
+};
+
+// Encontrar platillo por nombre exacto o alias en el texto
+function encontrarPlatillo(msg) {
+    // Primero búsqueda exacta por nombre completo
+    for (let nombre in platillosData) {
+        if (msg.includes(nombre.toLowerCase())) return nombre;
+    }
+    // Luego búsqueda por aliases
+    for (let nombre in platilloAliases) {
+        const aliases = platilloAliases[nombre];
+        for (let alias of aliases) {
+            if (msg.includes(alias)) return nombre;
+        }
+    }
+    return null;
+}
+
 function processBotMessageLocal(message) {
     const msg = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // Silenciar / activar asistente
-    if (msg.includes('silenciar') || msg.includes('desactivar asistente') || msg.includes('silencio')) {
+    if (msg.match(/silenciar|desactivar asistente|silencio|para|detente|stop/)) {
         desactivarTTS();
         if (recognitionInstance) { try { recognitionInstance.stop(); } catch(e) {} recognitionInstance = null; }
         return "Asistente de voz silenciado.";
     }
 
     // Saludos
-    if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches/)) {
-        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes.";
+    if (msg.match(/hola|buenas|hey|que tal|buenos dias|tardes|noches|hi|hello/)) {
+        return "¡Hola! Puedes pedir tu comida diciendo, por ejemplo: 'quiero 2 tacos al pastor'. También puedo informarte sobre ingredientes o decirte el menú completo.";
     }
-    // Menú
-    if (msg.match(/menu|platillos|comida|que tiene|opciones/)) {
-        let menu = "Platillos disponibles:\n";
-        for (let nombre in platillosData) menu += `- ${nombre}: $${platillosData[nombre].price}\n`;
-        return menu + "Puedes pedir uno o varios con cantidad, ej. '3 tacos'.";
+    // Menú completo
+    if (msg.match(/menu|platillos|comida|que tiene|opciones|que hay|que sirven|que ofrecen|carta/)) {
+        let menuTxt = "Platillos disponibles: ";
+        for (let nombre in platillosData) menuTxt += `${nombre} a ${precioParaVoz(platillosData[nombre].price)}, `;
+        return menuTxt.replace(/, $/, '') + ". Puedes pedir uno o varios con cantidad, ej. 'dos tacos' o 'tres pizzas'.";
     }
-    // Ingredientes
-    if (msg.match(/ingredientes|que contiene|que lleva/i)) {
-        for (let nombre in platillosData) {
-            if (msg.includes(nombre.toLowerCase())) {
-                return `${nombre} lleva: ${platillosData[nombre].ingredients.join(', ')}. ¿Deseas quitar o agregar algo?`;
-            }
+    // Ingredientes de un platillo específico
+    if (msg.match(/ingredientes|que contiene|que lleva|tiene|componentes|alergen/)) {
+        const platillo = encontrarPlatillo(msg);
+        if (platillo) {
+            return `${platillo} lleva: ${platillosData[platillo].ingredients.join(', ')}. ¿Deseas quitar o agregar algún ingrediente?`;
         }
-        return "Dime de qué platillo quieres saber los ingredientes.";
+        return "Dime de qué platillo quieres saber los ingredientes. Por ejemplo: '¿qué ingredientes tiene el sushi?'";
     }
-    // Modificar ingrediente
-    const mod = msg.match(/(quitar|sin|eliminar?)\s+([\w\s]+?)(?:\s+(de|del)\s+(.+))?$/);
-    if (mod) return modificarIngrediente(mod[2].trim(), 'quitar', mod[4]?.trim());
-    const add = msg.match(/(agregar|añadir|poner|con)\s+([\w\s]+?)(?:\s+(a|en|al)\s+(.+))?$/);
-    if (add) return modificarIngrediente(add[2].trim(), 'agregar', add[4]?.trim());
+    // Modificar ingrediente — quitar
+    const modQuitar = msg.match(/(quitar|sin|eliminar|no quiero|no le pongas|omitir|remove)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(de|del|en|al)\s+(.+))?$/);
+    if (modQuitar) return modificarIngrediente((modQuitar[3] || '').trim(), 'quitar', modQuitar[5]?.trim());
+    // Modificar ingrediente — agregar
+    const modAgregar = msg.match(/(agregar|añadir|poner|con extra|extra|adicional|add)\s+(el\s+|la\s+|los\s+|las\s+)?([\w\s]+?)(?:\s+(a|en|al|sobre)\s+(.+))?$/);
+    if (modAgregar) return modificarIngrediente((modAgregar[3] || '').trim(), 'agregar', modAgregar[5]?.trim());
 
-    // Pedido con cantidad
-    const cantidad = extraerCantidad(msg);
-    for (let nombre in platillosData) {
-        if (msg.includes(nombre.toLowerCase())) {
-            agregarAlCarrito(nombre, platillosData[nombre].price, cantidad);
-            // Guardar orden en sessionStorage para recuperar en recarga
-            sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
-            return `He añadido ${cantidad} ${nombre} a tu orden. ¿Algo más?`;
-        }
+    // Pedido con cantidad — detectar intención de ordenar + platillo
+    // Patrones: "quiero X tacos", "dame X sushi", "ponme X pizza", "pide X hamburguesa", "agrega X pollo", etc.
+    const intencionPedir = msg.match(/(quiero|quisiera|dame|ponme|pedir|pide|agrega|agregar|añade|ordenar|orden|trae|traeme|deseo|necesito|deme|ponle|va|van)/);
+    const platilloDetectado = encontrarPlatillo(msg);
+    if (platilloDetectado) {
+        const cantidad = extraerCantidad(msg);
+        agregarAlCarrito(platilloDetectado, platillosData[platilloDetectado].price, cantidad);
+        sessionStorage.setItem('ordenGuardada', JSON.stringify({ items: orden, total }));
+        const precioVoz = precioParaVoz(platillosData[platilloDetectado].price * cantidad);
+        return `He añadido ${cantidad} ${platilloDetectado} a tu orden. Total de ese artículo: ${precioVoz}. ¿Algo más?`;
     }
     // Resumen / cuenta / total
-    if (msg.match(/total|cuenta|resumen|orden|que llevo|cuanto es/)) {
-        if (orden.length === 0) return "Tu orden está vacía.";
+    if (msg.match(/total|cuenta|resumen|orden|que llevo|cuanto es|cuanto debo|cuanto seria|pedido|mi orden/)) {
+        if (orden.length === 0) return "Tu orden está vacía. Puedes pedir algo diciendo el nombre del platillo.";
         let resumen = "Tu orden tiene: ";
-        orden.forEach(i => resumen += `${i.cantidad} ${i.nombre} a ${(i.precio*i.cantidad).toFixed(2)} pesos. `);
-        resumen += `El total es ${total.toFixed(2)} pesos.`;
+        orden.forEach(i => resumen += `${i.cantidad} ${i.nombre} a ${precioParaVoz(i.precio * i.cantidad)}. `);
+        resumen += `El total es ${precioParaVoz(total)}.`;
         return resumen;
     }
+    // Eliminar un platillo de la orden
+    if (msg.match(/eliminar|quitar de la orden|borrar|remover|cancel/)) {
+        const platilloEliminar = encontrarPlatillo(msg);
+        if (platilloEliminar) {
+            const idx = orden.findIndex(i => i.nombre === platilloEliminar);
+            if (idx !== -1) {
+                eliminarDelCarrito(orden[idx].id);
+                return `He eliminado ${platilloEliminar} de tu orden.`;
+            }
+            return `No tienes ${platilloEliminar} en tu orden.`;
+        }
+    }
     // Pagar / enviar / finalizar
-    if (msg.match(/enviar|descargar|pagar|finalizar|listo|cobrar/)) {
-        if (orden.length === 0) return "No hay nada que enviar.";
+    if (msg.match(/enviar|descargar|pagar|finalizar|listo|cobrar|terminar|ya es todo|eso es todo|confirmar|confirma/)) {
+        if (orden.length === 0) return "No hay nada que enviar. ¿Qué deseas ordenar?";
         let resumen = "Finalizando su orden. Tiene: ";
         orden.forEach(i => resumen += `${i.cantidad} ${i.nombre}. `);
-        resumen += `Total a pagar: ${total.toFixed(2)} pesos. Descargando archivo.`;
+        resumen += `Total a pagar: ${precioParaVoz(total)}. Descargando archivo para mostrar al personal.`;
         setTimeout(() => descargarOrden(), 1200);
         return resumen;
     }
-    // Ayuda
-    if (msg.match(/ayuda|que puedo hacer|como funciona/)) {
-        return "Puedes pedir platillos (ej. '2 tacos'), preguntar ingredientes, quitar ingredientes (ej. 'sin queso'), ver el total, o pagar.";
+    // Precio de un platillo
+    if (msg.match(/cuanto cuesta|precio|cuanto vale|cuanto es el|cuanto son/)) {
+        const platilloPrecio = encontrarPlatillo(msg);
+        if (platilloPrecio) return `${platilloPrecio} cuesta ${precioParaVoz(platillosData[platilloPrecio].price)}.`;
+        return "Dime de qué platillo quieres saber el precio. Por ejemplo: '¿cuánto cuesta el salmón?'";
     }
-    return "No entendí. Puedes pedir algo como '2 tacos al pastor' o preguntar 'ingredientes de la pizza'.";
+    // Descripción de un platillo
+    if (msg.match(/describe|descripcion|como es|que es|cuéntame|cuentame|informacion/)) {
+        const platilloDesc = encontrarPlatillo(msg);
+        if (platilloDesc) return `${platilloDesc}: ${platillosData[platilloDesc].desc}`;
+        return "Dime de qué platillo quieres la descripción.";
+    }
+    // Ayuda
+    if (msg.match(/ayuda|que puedo hacer|como funciona|ayudame|commands|comandos/)) {
+        return "Puedes decir: 'quiero 2 tacos', 'dame una pizza', 'ingredientes del sushi', 'sin queso la hamburguesa', 'cuánto es el total', o 'ya es todo' para finalizar tu orden.";
+    }
+    // Respuesta por defecto
+    return "No entendí bien. Puedes pedir algo como '2 tacos al pastor', 'una pizza', 'qué ingredientes tiene el sushi', o di 'menú' para escuchar todas las opciones.";
 }
 function modificarIngrediente(ingrediente, accion, platilloRef) {
     let item = null;
